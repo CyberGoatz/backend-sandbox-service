@@ -40,6 +40,13 @@ DOCKERFILE_TEMPLATE = 'Dockerfile.j2'
 GIT_CREDENTIALS_FILENAME = '.git-credentials'
 
 
+def _uses_external_proxy_jump() -> bool:
+    """
+    Azure connects through MAN directly. Other providers keep the existing proxy jump flow.
+    """
+    return not settings.AZURE_PROVIDER_CONFIGURED
+
+
 class AnsibleRunner:
     """
     Represents Docker container environment for executing Ansible.
@@ -74,8 +81,9 @@ class AnsibleRunner:
         self.git_credentials = os.path.join(self.directory_path, GIT_CREDENTIALS_FILENAME)
 
         self.container_mgmt_private_key = self.container_ssh_path(MGMT_PRIVATE_KEY_FILENAME)
-        self.container_proxy_private_key =\
-            self.container_ssh_path(settings.CRCZP_CONFIG.proxy_jump_to_man.IdentityFile)
+        proxy_identity_file = settings.CRCZP_CONFIG.proxy_jump_to_man.IdentityFile
+        self.container_proxy_private_key = \
+            self.container_ssh_path(proxy_identity_file) if proxy_identity_file else None
 
         self.container_manager = KubernetesContainer\
             if settings.CRCZP_CONFIG.ansible_runner_settings.backend == 'kubernetes'\
@@ -96,12 +104,13 @@ class AnsibleRunner:
         """
         self.container_manager.delete_container(container_name)
 
-    def _prepare_ssh_dir(self):
+    def _prepare_ssh_dir(self, include_proxy_key: bool = True):
         """
         Create SSH directory with private key for communication with Proxy Jump.
         """
         self.make_dir(self.ssh_directory)
-        shutil.copy(settings.CRCZP_CONFIG.proxy_jump_to_man.IdentityFile, self.ssh_directory)
+        if include_proxy_key:
+            shutil.copy(settings.CRCZP_CONFIG.proxy_jump_to_man.IdentityFile, self.ssh_directory)
 
     def _prepare_container_directory(self):
         self.make_dir(self.containers_path)
@@ -150,7 +159,7 @@ class AllocationAnsibleRunner(AnsibleRunner):
         """
         Prepare files for SSH communication that will be bind to Docker container.
         """
-        self._prepare_ssh_dir()
+        self._prepare_ssh_dir(include_proxy_key=_uses_external_proxy_jump())
         self.save_file(self.host_ssh_path(USER_PUBLIC_KEY_FILENAME), sandbox.public_user_key)
         self.save_file(self.host_ssh_path(MGMT_PUBLIC_KEY_FILENAME), pool.public_management_key)
         self.save_file(self.host_ssh_path(MGMT_PRIVATE_KEY_FILENAME), pool.private_management_key)
@@ -239,9 +248,16 @@ class AllocationAnsibleRunner(AnsibleRunner):
             'global_head_ip': settings.CRCZP_CONFIG.head_host,
             'global_syslog_destination_port': settings.CRCZP_CONFIG.syslog_destination_port,
         }
+        inventory_kwargs = {}
+        if settings.AZURE_PROVIDER_CONFIGURED:
+            inventory_kwargs = {
+                'proxy_jump_host': top_ins.ip,
+                'proxy_jump_user': top_ins.man.base_box.mgmt_user,
+                'user_access_present': False,
+            }
         return Inventory(sau.pool.get_pool_prefix(), sau.get_stack_name(),
                          top_ins, self.container_mgmt_private_key, mgmt_public_certificate,
-                         mgmt_public_key, user_public_key, extra_vars)
+                         mgmt_public_key, user_public_key, extra_vars, **inventory_kwargs)
 
 
 class CleanupAnsibleRunner(AnsibleRunner):

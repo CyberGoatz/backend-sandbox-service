@@ -118,6 +118,15 @@ class AwsConfiguration(Object):
     base_subnet = Attribute(type=str, default='Base Subnet')
 
 
+class AzureConfiguration(Object):
+    subscription_id = Attribute(type=str, default='')
+    tenant_id = Attribute(type=str, default='')
+    client_id = Attribute(type=str, default='')
+    client_secret = Attribute(type=str, default='')
+    resource_group_name = Attribute(type=str, default='')
+    location = Attribute(type=str, default='')
+
+
 class NamingStrategy(Object):
     pattern = Attribute(type=str)
     replace = Attribute(type=str, default='')
@@ -157,6 +166,7 @@ class CrczpConfiguration(Object):
     )
 
     aws = Attribute(type=AwsConfiguration, default=None)
+    azure = Attribute(type=AzureConfiguration, default=None)
 
     log_file = Attribute(type=str, default=LOG_FILE)
     log_level = Attribute(type=str, default=LOG_LEVEL)

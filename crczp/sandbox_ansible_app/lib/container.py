@@ -62,6 +62,20 @@ class BaseContainer(abc.ABC):
         self.stage_info = {'cleanup_stage': self.stage} if self.cleanup\
             else {'allocation_stage': self.stage}
 
+    def _build_runner_command(self):
+        """
+        Build ansible-runner CLI arguments.
+
+        The answers-storage endpoint is optional in local/dev environments.
+        """
+        command = ['-u', self.url, '-r', self.rev, '-i', self.ANSIBLE_INVENTORY_PATH.bind]
+        answers_storage_api = (settings.CRCZP_CONFIG.answers_storage_api or '').strip()
+        if answers_storage_api:
+            command += ['-a', answers_storage_api]
+        if self.cleanup:
+            command += ['-c']
+        return command
+
     @abc.abstractmethod
     def _run_container(self):
         """Run the container."""
@@ -117,9 +131,7 @@ class DockerContainer(BaseContainer):
             self.containers_path: self.ANSIBLE_DOCKER_CONTAINER_PATH.__dict__,
             self.credentials_path: self.GIT_CREDENTIALS_PATH.__dict__
         }
-        command = ['-u', self.url, '-r', self.rev, '-i', self.ANSIBLE_INVENTORY_PATH.bind,
-                   '-a', settings.CRCZP_CONFIG.answers_storage_api]
-        command += ['-c'] if self.cleanup else []
+        command = self._build_runner_command()
         LOG.debug("Ansible container options", command=command)
         return self.CLIENT().containers.run(settings.CRCZP_CONFIG.ansible_docker_image, detach=True,
                                             command=command, volumes=volumes,
@@ -196,10 +208,8 @@ class KubernetesContainer(BaseContainer):
         kuber_container = client.V1Container(
             name=self.job_name,
             image=settings.CRCZP_CONFIG.ansible_docker_image,
-            args=['-u', self.url, '-r', self.rev, '-i', self.ANSIBLE_INVENTORY_PATH.bind,
-                  '-a', settings.CRCZP_CONFIG.answers_storage_api]
+            args=self._build_runner_command()
         )
-        kuber_container.args += ['-c'] if self.cleanup else []
 
         # Add environment variable for Git SSL verification
         kuber_container.env = [

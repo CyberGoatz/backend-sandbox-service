@@ -1031,12 +1031,17 @@ class TopologyNodeConnectionData(APIView):
     # noinspection PyMethodMayBeStatic
     def get(self, request, *args, **kwargs):
         """Retrieves data needed to establish connection to a node in the topology."""
-        sandbox = sandboxes.get_sandbox(kwargs.get('sandbox_uuid'))
-        if sandbox is None:
-            raise Http404(f"Sandbox with UUID {kwargs.get('sandbox_uuid')} does not exist.")
+        sandbox_uuid = kwargs.get('sandbox_uuid')
         node_name = kwargs.get('node_name')
+        username = None if isinstance(request.user, AnonymousUser) else request.user.username
+        sandbox = sandboxes.get_sandbox(sandbox_uuid)
+        if sandbox is None:
+            raise Http404(f"Sandbox with UUID {sandbox_uuid} does not exist.")
         topology_instance = sandboxes.get_topology_instance(sandbox)
         node = topology_instance.get_node(node_name)
         if node is None:
             raise Http404(f"Node with name {node_name} does not exist in the topology of sandbox {sandbox.id}.")
-        return Response(serializers.NodeAccessDataSerializer(nodes.get_node_access_data(topology_instance, node)).data)
+        node_access_data = nodes.get_node_access_data(topology_instance, node)
+        serialized_data = serializers.NodeAccessDataSerializer(node_access_data).data
+
+        return Response(serialized_data)

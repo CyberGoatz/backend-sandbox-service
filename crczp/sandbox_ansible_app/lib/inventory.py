@@ -230,19 +230,24 @@ class BaseInventory(Group):
     Represents Ansible inventory just for Proxy Jump.
     """
     def __init__(self, proxy_jump_user_access_mgmt_name: str,
-                 proxy_jump_user_access_user_name: str):
+                 proxy_jump_user_access_user_name: str,
+                 proxy_jump_host: Optional[str] = None,
+                 proxy_jump_user: Optional[str] = None,
+                 user_access_present: bool = True):
         super().__init__('all')
+        self.proxy_jump_host = proxy_jump_host or settings.CRCZP_CONFIG.proxy_jump_to_man.Host
+        self.proxy_jump_user = proxy_jump_user or settings.CRCZP_CONFIG.proxy_jump_to_man.User
+        self.user_access_present = user_access_present
         self.add_proxy_jump(proxy_jump_user_access_mgmt_name, proxy_jump_user_access_user_name)
 
     def add_proxy_jump(self, user_access_mgmt_name: str, user_access_user_name: str) -> None:
         """
         Add Ansible host for Proxy Jump to this group.
         """
-        proxy_jump_config = settings.CRCZP_CONFIG.proxy_jump_to_man
-        host = Host(PROXY_JUMP_NAME, proxy_jump_config.Host, proxy_jump_config.User)
+        host = Host(PROXY_JUMP_NAME, self.proxy_jump_host, self.proxy_jump_user)
         host.add_variables(user_access_mgmt_name=user_access_mgmt_name,
                            user_access_user_name=user_access_user_name,
-                           user_access_present=False)
+                           user_access_present=self.user_access_present)
         self.add_host(host)
 
     def to_dict(self) -> dict:
@@ -273,8 +278,11 @@ class Inventory(BaseInventory):
     def __init__(self, proxy_jump_user_access_mgmt_name: str, proxy_jump_user_access_user_name: str,
                  topology_instance: TopologyInstance, mgmt_private_key: str,
                  mgmt_public_certificate: str, mgmt_public_key: str, user_public_key: str,
-                 extra_vars: dict = None):
-        super().__init__(proxy_jump_user_access_mgmt_name, proxy_jump_user_access_user_name)
+                 extra_vars: dict = None, proxy_jump_host: Optional[str] = None,
+                 proxy_jump_user: Optional[str] = None, user_access_present: bool = True):
+        super().__init__(proxy_jump_user_access_mgmt_name, proxy_jump_user_access_user_name,
+                         proxy_jump_host=proxy_jump_host, proxy_jump_user=proxy_jump_user,
+                         user_access_present=user_access_present)
         self.topology_instance = topology_instance
         self.routing = Routing(topology_instance)
 
@@ -283,8 +291,9 @@ class Inventory(BaseInventory):
         self._create_groups()
         self._create_user_defined_groups()
         self._add_user_network_ip_to_user_defined_nodes()
+        self._add_host_management_interfaces_to_hosts()
+        self._add_host_network_interfaces_to_hosts()
 
-        self.get_host(PROXY_JUMP_NAME).add_variables(user_access_present=True)
         self.get_group('winrm_nodes')\
             .add_variables(**self._get_winrm_connection_variables(mgmt_private_key,
                                                                   mgmt_public_certificate))
@@ -437,6 +446,50 @@ class Inventory(BaseInventory):
             if link.node.name == 'uan':
                 continue
             self.hosts[link.node.name].add_variables(user_network_ip=link.ip)
+
+    def _add_host_network_interfaces_to_hosts(self) -> None:
+        """
+        Add explicit host-network interface metadata for each non-router node.
+
+        Azure can attach multiple NICs correctly while the guest OS still only brings up the
+        management NIC. These variables allow the host networking playbook to configure the
+        lab-facing NICs by MAC address with the IPs defined in topology.yml.
+        """
+        host_networks = self.topology_instance.get_hosts_networks()
+
+        for node in self.topology_instance.get_hosts():
+            host_links = self.topology_instance.get_node_links(node, host_networks)
+            interfaces = []
+            for link in host_links:
+                if not link.ip or not link.mac:
+                    continue
+                interfaces.append({
+                    'mac': link.mac,
+                    'ip': link.ip,
+                    'net_prefix': ip_network(link.network.cidr).prefixlen,
+                })
+
+            if interfaces:
+                self.hosts[node.name].add_variables(host_network_interfaces=interfaces)
+
+    def _add_host_management_interfaces_to_hosts(self) -> None:
+        """
+        Add explicit management-network interface metadata for each non-router node.
+
+        Azure sandboxes use a dedicated management NIC in addition to the lab NICs. Host
+        provisioning must preserve that NIC in netplan, otherwise only the lab network remains
+        configured after the host networking stage rewrites /etc/netplan/50-cloud-init.yaml.
+        """
+        for link in self.topology_instance.get_network_links(self.topology_instance.man_network):
+            if link.node == self.topology_instance.man:
+                continue
+            if not link.ip or not link.mac:
+                continue
+            self.hosts[link.node.name].add_variables(host_management_interface={
+                'mac': link.mac,
+                'ip': link.ip,
+                'net_prefix': ip_network(link.network.cidr).prefixlen,
+            })
 
     def _update_docker_hosts(self) -> None:
         print("Updating docker hosts")

@@ -50,6 +50,10 @@ dependencies = [
     "gunicorn"
 ]
 
+[tool.uv.sources]
+crczp-terraform-client = { path = "../backend-terraform-client" }
+crczp-azure-lib = { path = "../backend-azure-lib" }
+
 [project.optional-dependencies]
 dev = [
     "tox",

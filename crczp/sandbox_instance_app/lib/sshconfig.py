@@ -90,15 +90,19 @@ class CrczpUserSSHConfig(CrczpSSHConfig):
     """
     Represents SSH config file used by CRCZP trainees.
     """
-    def __init__(self, top_ins: TopologyInstance, proxy_host: str, proxy_user: str,
+    def __init__(self, top_ins: TopologyInstance, proxy_host: Optional[str] = None,
+                 proxy_user: Optional[str] = None,
                  sandbox_private_key_path: str = '<path_to_sandbox_private_key>', proxy_port: int = 22):
         super().__init__()
-        # Create an entry for PROXY JUMP host.
-        self.add_host(proxy_host, proxy_user, sandbox_private_key_path, port=proxy_port)
-        proxy_jump = f'{proxy_user}@{proxy_host}:{proxy_port}' if proxy_port != 22 else f'{proxy_user}@{proxy_host}'
-        # Create an entry for MAN as a proxy jump host.
-        self.add_host(top_ins.ip, SSH_PROXY_USERNAME, sandbox_private_key_path,
-                      proxy_jump=proxy_jump, alias=top_ins.man.name)
+        # Create an entry for MAN directly or behind an external proxy jump host.
+        if proxy_host and proxy_user:
+            self.add_host(proxy_host, proxy_user, sandbox_private_key_path, port=proxy_port)
+            proxy_jump = f'{proxy_user}@{proxy_host}:{proxy_port}' if proxy_port != 22 else f'{proxy_user}@{proxy_host}'
+            self.add_host(top_ins.ip, SSH_PROXY_USERNAME, sandbox_private_key_path,
+                          proxy_jump=proxy_jump, alias=top_ins.man.name)
+        else:
+            self.add_host(top_ins.ip, SSH_PROXY_USERNAME, sandbox_private_key_path,
+                          alias=top_ins.man.name)
         man_proxy_jump = f'{SSH_PROXY_USERNAME}@{top_ins.man.name}'
 
         # Create an entry for user-accessible nodes of a sandbox.
@@ -118,16 +122,20 @@ class CrczpMgmtSSHConfig(CrczpSSHConfig):
     """
     Represents SSH config file used by CRCZP designers/organizers.
     """
-    def __init__(self, top_ins: TopologyInstance, proxy_host: str, proxy_user: str, proxy_port: int = 22,
+    def __init__(self, top_ins: TopologyInstance, proxy_host: Optional[str] = None,
+                 proxy_user: Optional[str] = None, proxy_port: int = 22,
                  pool_private_key_path: str = '<path_to_pool_private_key>',
                  proxy_private_key_path: str = '<path_to_pool_private_key>'):
         super().__init__()
-        # Create an entry for PROXY JUMP host.
-        self.add_host(proxy_host, proxy_user, proxy_private_key_path, port=proxy_port)
-        proxy_jump = f'{proxy_user}@{proxy_host}:{proxy_port}' if proxy_port != 22 else f'{proxy_user}@{proxy_host}'
-        # Create an entry for MAN as a proxy jump host.
-        self.add_host(top_ins.ip, top_ins.man.base_box.mgmt_user, pool_private_key_path,
-                      proxy_jump=proxy_jump, alias=top_ins.man.name)
+        # Create an entry for MAN directly or behind an external proxy jump host.
+        if proxy_host and proxy_user:
+            self.add_host(proxy_host, proxy_user, proxy_private_key_path, port=proxy_port)
+            proxy_jump = f'{proxy_user}@{proxy_host}:{proxy_port}' if proxy_port != 22 else f'{proxy_user}@{proxy_host}'
+            self.add_host(top_ins.ip, top_ins.man.base_box.mgmt_user, pool_private_key_path,
+                          proxy_jump=proxy_jump, alias=top_ins.man.name)
+        else:
+            self.add_host(top_ins.ip, top_ins.man.base_box.mgmt_user, pool_private_key_path,
+                          alias=top_ins.man.name)
         man_proxy_jump = f'{top_ins.man.base_box.mgmt_user}@{top_ins.man.name}'
 
         # Create an entry for every other node of a sandbox.
@@ -149,14 +157,15 @@ class CrczpAnsibleSSHConfig(CrczpMgmtSSHConfig):
     Represents SSH config file used by CRCZP automated provisioning using Ansible.
     """
     def __init__(self, top_ins: TopologyInstance, pool_private_key_path: str,
-                 proxy_host: str, proxy_user: str, proxy_private_key_path: str, proxy_port: int = 22):
+                 proxy_host: Optional[str] = None, proxy_user: Optional[str] = None,
+                 proxy_private_key_path: Optional[str] = None, proxy_port: int = 22):
         super().__init__(
             top_ins=top_ins,
             proxy_host=proxy_host,
             proxy_user=proxy_user,
             proxy_port=proxy_port,
             pool_private_key_path=pool_private_key_path,
-            proxy_private_key_path=proxy_private_key_path
+            proxy_private_key_path=proxy_private_key_path or pool_private_key_path
         )
 
 

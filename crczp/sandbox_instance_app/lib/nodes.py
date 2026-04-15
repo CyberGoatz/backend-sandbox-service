@@ -135,8 +135,15 @@ def find_image_for_node(node: Node, images=None) -> Image:
     for image in images:
         if image.name == node.base_box.image:
             return image
-
-    raise exceptions.ValidationError(f"No image found for node {node.name}")
+    
+    client = utils.get_terraform_client()
+    try:
+        return client.get_image(node.base_box.image)
+    except Exception:
+        raise exceptions.ValidationError(
+            f"No image found for node {node.name}, box image: {node.base_box.image}, "
+            f"image returned from server: {', '.join([image.name for image in images])}"
+        )
 
 
 def get_node_available_protocols(node: Node) -> list[Protocol]:
@@ -154,8 +161,31 @@ def get_node_image_has_gui_access(image: Image) -> bool:
     return image.owner_specified.get('owner_specified.openstack.gui_access') == 'true'
 
 
+def _get_management_node_ip(topology_instance: TopologyInstance, node: Node) -> str | None:
+    """Get the IP address of a node reachable from MAN over the management network."""
+    try:
+        man_link_pairs = topology_instance.get_link_pairs_man_to_nodes_over_management_network()
+    except AttributeError:
+        return None
+
+    for link_pair in man_link_pairs:
+        node_link = link_pair.second
+        if node_link.node == node and node_link.ip:
+            return node_link.ip
+
+    return None
+
+
 def _get_node_ip(topology_instance: TopologyInstance, node: Node) -> str:
-    """Get the IP address of a node from the topology instance."""
+    """Get the IP address of a node from the topology instance.
+
+    Prefer the management-network address because Guacamole/guacd connects from MAN.
+    Fall back to the existing user-accessible host/WAN lookup when no management path exists.
+    """
+    management_ip = _get_management_node_ip(topology_instance, node)
+    if management_ip:
+        return management_ip
+
     host_links = topology_instance.get_node_links(node, topology_instance.get_hosts_networks())
     router_links = topology_instance.get_node_links(node, [topology_instance.wan])
 
