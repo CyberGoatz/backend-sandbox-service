@@ -164,6 +164,11 @@ class StackStageHandler(StageHandler):
             terraform_output.objects.create(**kwargs, content=stderr)
             raise CrczpException(f'Terraform execution failed. See logs for details.')
 
+    def _get_terraform_output_binding(self):
+        if isinstance(self.stage, StackCleanupStage):
+            return CleanupTerraformOutput, {'cleanup_stage': self.stage}
+        return AllocationTerraformOutput, {'allocation_stage': self.stage}
+
     def _delete_stack(self, allocation_unit: SandboxAllocationUnit, log_output: bool = True)\
             -> None:
         """
@@ -177,10 +182,10 @@ class StackStageHandler(StageHandler):
         try:
             process = self._client.delete_stack(stack_name)
             if process:
+                terraform_output_model, terraform_output_kwargs = self._get_terraform_output_binding()
                 if log_output:
-                    self._log_process_output(process, CleanupTerraformOutput,
-                                             cleanup_stage=self.stage)
-                self._wait_for_process(process, CleanupTerraformOutput, cleanup_stage=self.stage)
+                    self._log_process_output(process, terraform_output_model, **terraform_output_kwargs)
+                self._wait_for_process(process, terraform_output_model, **terraform_output_kwargs)
             else:
                 # process is None when delete_stack is not able to initialize stack directory,
                 # but it is not a problem because creation failed to initialize as well

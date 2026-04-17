@@ -155,7 +155,13 @@ class GitHubProvider(DefinitionProvider):
 
     def get_rev_sha(self, rev: str) -> str:
         """
-        Return revision specified on the input. This method is created
-        only for the compatibility reasons with GitLab client.
+        Resolve a GitHub branch, tag, or commit-ish to a commit SHA so topology cache keys
+        change when the branch content changes.
         """
-        return rev
+        try:
+            try:
+                return self.repo.get_branch(rev).commit.sha
+            except GithubException:
+                return self.repo.get_commit(rev).sha
+        except GithubException as exc:
+            raise exceptions.GitError(f"Failed to get sha of the GIT rev '{rev}'.") from exc
