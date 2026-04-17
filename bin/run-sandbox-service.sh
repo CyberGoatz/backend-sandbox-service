@@ -14,10 +14,14 @@ except IntegrityError:
 
 set -e
 
+echo "Running Django migrations"
 python manage.py migrate
 python manage.py createcachetable
+echo "Ensuring admin user exists"
 python manage.py shell << EOF
 ${CREATE_SUPERUSER}
 EOF
+echo "Registering roles in user-and-group"
 python manage.py register_roles
+echo "Starting gunicorn on ${LISTEN_IP}:${LISTEN_PORT}"
 gunicorn --bind ${LISTEN_IP}:${LISTEN_PORT} --timeout 600 --workers 5 crczp.sandbox_service_project.wsgi:application
