@@ -45,6 +45,37 @@ class TestCreatePool:
         assert pool.rev == definition.rev
         assert pool.definition.id == DEFINITION_ID
 
+    def test_create_pool_creates_certificate_only_when_provider_supports_x509(self, definition, created_by, mocker):
+        mock_certificate = mocker.patch(
+            'crczp.sandbox_instance_app.lib.pools.utils.create_self_signed_certificate',
+            return_value='certificate',
+        )
+        mocker.patch.object(settings, 'X509_KEYPAIR_SUPPORTED', True)
+
+        pool = pools.create_pool(
+            dict(definition_id=DEFINITION_ID, max_size=self.MAX_SIZE),
+            created_by=created_by,
+        )
+
+        mock_certificate.assert_called_once()
+        assert pool.management_certificate == 'certificate'
+        self.client.return_value.create_keypair.assert_any_call(pool.certificate_keypair_name, 'certificate', 'x509')
+
+    def test_create_pool_skips_certificate_for_ssh_only_providers(self, definition, created_by, mocker):
+        mock_certificate = mocker.patch('crczp.sandbox_instance_app.lib.pools.utils.create_self_signed_certificate')
+        mocker.patch.object(settings, 'X509_KEYPAIR_SUPPORTED', False)
+
+        pool = pools.create_pool(
+            dict(definition_id=DEFINITION_ID, max_size=self.MAX_SIZE),
+            created_by=created_by,
+        )
+
+        mock_certificate.assert_not_called()
+        assert pool.management_certificate == ''
+        create_keypair_calls = self.client.return_value.create_keypair.call_args_list
+        assert len(create_keypair_calls) == 1
+        assert create_keypair_calls[0].args == (pool.ssh_keypair_name, pool.public_management_key, 'ssh')
+
     def test_create_pool_invalid_definition(self, created_by):
         with pytest.raises(Http404):
             pools.create_pool(dict(definition_id=-1,
