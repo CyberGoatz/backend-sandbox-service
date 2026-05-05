@@ -93,6 +93,21 @@ class PoolSerializerCreate(PoolSerializer):
         read_only_fields = ('id', 'size')
 
 
+class PoolAvailabilitySerializer(serializers.ModelSerializer):
+    size = serializers.SerializerMethodField(
+        help_text='Number of currently available allocation units associated with this pool.'
+    )
+
+    class Meta:
+        model = models.Pool
+        fields = ('id', 'size', 'max_size')
+        read_only_fields = ('id', 'size', 'max_size')
+
+    @staticmethod
+    def get_size(pool: models.Pool) -> int:
+        return PoolSerializer.get_size(pool)
+
+
 class RequestSerializer(serializers.ModelSerializer):
     allocation_unit_id = serializers.PrimaryKeyRelatedField(source='allocation_unit',
                                                             read_only=True)

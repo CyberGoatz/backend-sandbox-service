@@ -21,7 +21,7 @@ from crczp.sandbox_instance_app.lib import pools, sandboxes, nodes, \
 from crczp.sandbox_instance_app.lib import stage_handlers
 from crczp.sandbox_instance_app.models import Pool, Sandbox, SandboxAllocationUnit, \
     AllocationRequest, CleanupRequest, SandboxLock, PoolLock
-from crczp.sandbox_uag.permissions import AdminPermission, OrganizerPermission
+from crczp.sandbox_uag.permissions import AdminPermission, OrganizerPermission, TraineePermission
 
 LOG = structlog.get_logger()
 
@@ -131,6 +131,23 @@ class PoolDetailDeleteUpdateView(generics.RetrieveDestroyAPIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    methods=["GET"],
+    responses={
+        200: serializers.PoolAvailabilitySerializer,
+        **SANDBOX_RESPONSES
+    }
+)
+class PoolAvailabilityView(generics.RetrieveAPIView):
+    """
+    get: Retrieve learner-safe pool availability.
+    """
+    queryset = Pool.objects.all()
+    serializer_class = serializers.PoolAvailabilitySerializer
+    lookup_url_kwarg = "pool_id"
+    permission_classes = [TraineePermission | OrganizerPermission | AdminPermission]
 
 
 @extend_schema(
