@@ -9,7 +9,7 @@ from rest_framework.test import APIRequestFactory
 
 from crczp.sandbox_common_lib.exceptions import ApiException, StackError
 from crczp.sandbox_instance_app.lib import pools, sshconfig
-from crczp.sandbox_instance_app.models import Pool, SandboxAllocationUnit, Sandbox
+from crczp.sandbox_instance_app.models import Pool, SandboxAllocationUnit, Sandbox, SandboxLock
 from crczp.sandbox_instance_app.views import PoolAvailabilityView, PoolListCreateView, SandboxGetAndLockView
 
 from crczp.cloud_commons import exceptions, HardwareUsage
@@ -96,13 +96,23 @@ class TestCreatePool:
 
     def test_pool_availability_view(self):
         pool = Pool.objects.get(id=POOL_ID)
+        sandbox = Sandbox.objects.filter(allocation_unit__pool=pool, ready=True).first()
+        assert sandbox is not None
+        SandboxLock.objects.create(sandbox=sandbox)
+
         request = self.arf.get(f'/pools/{POOL_ID}/availability')
         response = PoolAvailabilityView.as_view()(request, pool_id=POOL_ID)
 
         pool.refresh_from_db()
+        free_sandbox_count = Sandbox.objects.filter(
+            allocation_unit__pool=pool,
+            ready=True,
+            lock__isnull=True,
+        ).count()
+
         assert response.data['id'] == POOL_ID
-        assert response.data['size'] == pool.size
-        assert response.data['max_size'] == pool.max_size
+        assert response.data['size'] == free_sandbox_count
+        assert response.data['max_size'] == pool.size
 
 
 class TestSandboxAllocationUnit:

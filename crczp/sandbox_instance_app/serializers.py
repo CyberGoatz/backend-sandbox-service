@@ -95,7 +95,10 @@ class PoolSerializerCreate(PoolSerializer):
 
 class PoolAvailabilitySerializer(serializers.ModelSerializer):
     size = serializers.SerializerMethodField(
-        help_text='Number of currently available allocation units associated with this pool.'
+        help_text='Number of currently available unlocked sandboxes associated with this pool.'
+    )
+    max_size = serializers.SerializerMethodField(
+        help_text='Number of built allocation units associated with this pool.'
     )
 
     class Meta:
@@ -105,6 +108,14 @@ class PoolAvailabilitySerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_size(pool: models.Pool) -> int:
+        return models.Sandbox.objects.filter(
+            allocation_unit__pool=pool,
+            ready=True,
+            lock__isnull=True,
+        ).count()
+
+    @staticmethod
+    def get_max_size(pool: models.Pool) -> int:
         return PoolSerializer.get_size(pool)
 
 
