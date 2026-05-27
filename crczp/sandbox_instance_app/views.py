@@ -1002,8 +1002,11 @@ class SandboxConsolesView(APIView):
         consoles are not ready yet."""
         sandbox = sandboxes.get_sandbox(kwargs.get('sandbox_uuid'))
         topology_instance = sandboxes.get_topology_instance(sandbox)
+        routers = [] if settings.AZURE_OMIT_ROUTER_VMS else [
+            router.name for router in topology_instance.get_routers()
+        ]
         node_names = [host.name for host in topology_instance.get_hosts() if not host.hidden] + \
-                     [router.name for router in topology_instance.get_routers()]
+                     routers
         consoles = {}
         is_ready = True
         for name in node_names:

@@ -166,8 +166,9 @@ class Routing:
     """
     Represents sandbox routing information.
     """
-    def __init__(self, topology_instance: TopologyInstance):
+    def __init__(self, topology_instance: TopologyInstance, native_routing: bool = False):
         self.topology_instance = topology_instance
+        self.native_routing = native_routing
         self.network_to_router_mappings = self._get_network_to_router_mapping(topology_instance)
         self.interfaces: Dict[str, Dict[str, Interface]] =\
             {node.name: {} for node in topology_instance.get_nodes()}
@@ -183,6 +184,9 @@ class Routing:
         """
         The main method that initializes a Routing instance from TopologyInstance.
         """
+        if self.native_routing:
+            return
+
         man_to_routers_link = self.topology_instance.get_link_between_node_and_network(
             self.topology_instance.man, self.topology_instance.wan
         )
@@ -284,7 +288,9 @@ class Inventory(BaseInventory):
                          proxy_jump_host=proxy_jump_host, proxy_jump_user=proxy_jump_user,
                          user_access_present=user_access_present)
         self.topology_instance = topology_instance
-        self.routing = Routing(topology_instance)
+        self.native_routing = getattr(settings, 'AZURE_NATIVE_ROUTING', False)
+        self.omit_router_vms = getattr(settings, 'AZURE_OMIT_ROUTER_VMS', False)
+        self.routing = Routing(topology_instance, native_routing=self.native_routing)
 
         self._create_hosts()
         self._set_ip_forward()
@@ -301,6 +307,9 @@ class Inventory(BaseInventory):
                            global_sandbox_ip=self.topology_instance.ip,
                            global_ssh_public_user_key=user_public_key,
                            global_ssh_public_mgmt_key=mgmt_public_key)
+        if self.native_routing or self.omit_router_vms:
+            self.add_variables(azure_native_routing=self.native_routing,
+                               azure_omit_router_vms=self.omit_router_vms)
         if extra_vars:
             self.add_variables(**extra_vars)
         if topology_instance.containers:
@@ -313,8 +322,18 @@ class Inventory(BaseInventory):
         mgmt_links = {link.node.name: link.ip for link in
                       self.topology_instance.get_network_links(self.topology_instance.man_network)}
         mgmt_links[self.topology_instance.man.name] = self.topology_instance.ip
-        for node in self.topology_instance.get_nodes():
+        for node in self._get_inventory_nodes():
             self._add_host(Host(node.name, mgmt_links[node.name], node.base_box.mgmt_user))
+
+    def _get_inventory_nodes(self) -> List:
+        """
+        Return topology nodes that are backed by real VMs and should be targeted by Ansible.
+        """
+        if not self.omit_router_vms:
+            return list(self.topology_instance.get_nodes())
+
+        routers = set(self.topology_instance.get_routers())
+        return [node for node in self.topology_instance.get_nodes() if node not in routers]
 
     def _add_host(self, host: Host) -> None:
         """
@@ -329,6 +348,13 @@ class Inventory(BaseInventory):
         """
         Set IP forward variable to Routers, Border-Router and MAN.
         """
+        if self.native_routing:
+            for node in [self.topology_instance.man] + list(self.topology_instance.get_routers()):
+                host = self.hosts.get(node.name)
+                if host:
+                    host.add_variables(ip_forward=False)
+            return
+
         ip_forward_nodes = list(self.topology_instance.get_routers()) +\
             [self.topology_instance.man]
         for node in ip_forward_nodes:
@@ -350,14 +376,17 @@ class Inventory(BaseInventory):
 
         self.add_group(Group(DefaultAnsibleHostsGroups.MANAGEMENT.value, [man]))
 
-        routers = [self.hosts[node.name] for node in self.topology_instance.get_routers()]
+        routers = [] if self.omit_router_vms else [
+            self.hosts[node.name] for node in self.topology_instance.get_routers()
+        ]
         self.add_group(Group(DefaultAnsibleHostsGroups.ROUTERS.value, routers))
 
-        winrm_nodes = [self.hosts[node.name] for node in self.topology_instance.get_nodes()
+        inventory_nodes = self._get_inventory_nodes()
+        winrm_nodes = [self.hosts[node.name] for node in inventory_nodes
                        if node.base_box.mgmt_protocol == Protocol.WINRM and node != man]
         self.add_group(Group(DefaultAnsibleHostsGroups.WINRM_NODES.value, winrm_nodes))
 
-        ssh_nodes = [self.hosts[node.name] for node in self.topology_instance.get_nodes()
+        ssh_nodes = [self.hosts[node.name] for node in inventory_nodes
                      if node.base_box.mgmt_protocol == Protocol.SSH and node != man]
         self.add_group(Group(DefaultAnsibleHostsGroups.SSH_NODES.value, ssh_nodes))
 
@@ -380,6 +409,8 @@ class Inventory(BaseInventory):
             hosts = []
             for monitored_node in self.topology_instance.get_monitored_hosts():
                 # inventory.hosts includes routers and switches
+                if monitored_node.node not in self.hosts:
+                    continue
                 host = self.hosts[monitored_node.node]
                 hosts.append(host)
                 hosts_variables[host.name] = {'targets': [{'port': target.port, 'interface': target.interface}
@@ -405,7 +436,7 @@ class Inventory(BaseInventory):
             image_os_type_map = {image.name: image.os_type for image in images}
 
             windows_hosts = []
-            for node in self.topology_instance.get_nodes():
+            for node in self._get_inventory_nodes():
                 image_name = node.base_box.image
                 os_type = image_os_type_map.get(image_name)
 
@@ -423,15 +454,20 @@ class Inventory(BaseInventory):
         """
         Create and return user accessible nodes from user accessible networks.
         """
-        return [self.hosts[link.node.name] for link in
-                self.topology_instance.get_links_to_user_accessible_nodes()]
+        return [
+            self.hosts[link.node.name] for link in
+            self.topology_instance.get_links_to_user_accessible_nodes()
+            if link.node.name in self.hosts
+        ]
 
     def _create_user_defined_groups(self) -> None:
         """
         Create user-defined Ansible group entries.
         """
         for group in self.topology_instance.get_groups():
-            self.add_group(Group(group.name, [self.hosts[node_name] for node_name in group.nodes]))
+            self.add_group(Group(group.name, [
+                self.hosts[node_name] for node_name in group.nodes if node_name in self.hosts
+            ]))
 
     def _add_user_network_ip_to_user_defined_nodes(self) -> None:
         """
@@ -444,6 +480,8 @@ class Inventory(BaseInventory):
 
         for link in networks_links:
             if link.node.name == 'uan':
+                continue
+            if link.node.name not in self.hosts:
                 continue
             self.hosts[link.node.name].add_variables(user_network_ip=link.ip)
 
@@ -459,15 +497,27 @@ class Inventory(BaseInventory):
 
         for node in self.topology_instance.get_hosts():
             host_links = self.topology_instance.get_node_links(node, host_networks)
+            connected_network_names = {link.network.name for link in host_links}
             interfaces = []
             for link in host_links:
                 if not link.ip or not link.mac:
                     continue
-                interfaces.append({
+                routes = []
+                if self.native_routing:
+                    gateway_ip = str(ip_network(link.network.cidr)[1])
+                    routes = [
+                        Route(network.cidr, gateway_ip).to_dict()
+                        for network in host_networks
+                        if network.name not in connected_network_names
+                    ]
+                interface = {
                     'mac': link.mac,
                     'ip': link.ip,
                     'net_prefix': ip_network(link.network.cidr).prefixlen,
-                })
+                }
+                if routes:
+                    interface['routes'] = routes
+                interfaces.append(interface)
 
             if interfaces:
                 self.hosts[node.name].add_variables(host_network_interfaces=interfaces)
@@ -484,6 +534,8 @@ class Inventory(BaseInventory):
             if link.node == self.topology_instance.man:
                 continue
             if not link.ip or not link.mac:
+                continue
+            if link.node.name not in self.hosts:
                 continue
             self.hosts[link.node.name].add_variables(host_management_interface={
                 'mac': link.mac,

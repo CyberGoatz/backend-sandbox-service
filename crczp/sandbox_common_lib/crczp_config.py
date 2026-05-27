@@ -125,6 +125,8 @@ class AzureConfiguration(Object):
     client_secret = Attribute(type=str, default='')
     resource_group_name = Attribute(type=str, default='')
     location = Attribute(type=str, default='')
+    native_routing = Attribute(type=bool, default=False)
+    omit_router_vms = Attribute(type=bool, default=False)
 
 
 class NamingStrategy(Object):

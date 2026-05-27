@@ -43,6 +43,15 @@ def _uses_direct_man_access() -> bool:
     return settings.AZURE_PROVIDER_CONFIGURED
 
 
+def _get_omitted_router_names(topology_instance: TopologyInstance) -> set[str]:
+    """
+    Return router nodes that are logical-only in Azure native routing mode.
+    """
+    if not getattr(settings, 'AZURE_OMIT_ROUTER_VMS', False):
+        return set()
+    return {router.name for router in topology_instance.get_routers()}
+
+
 def get_post_data_json(user_id, access_token, generated_variables):
     post_data = {
         'user_id': user_id,
@@ -118,12 +127,24 @@ def get_user_sshconfig(sandbox: Sandbox,
         -> CrczpUserSSHConfig:
     """Get user SSH config."""
     ti = get_topology_instance(sandbox)
+    omitted_router_names = _get_omitted_router_names(ti)
     if _uses_direct_man_access():
-        return CrczpUserSSHConfig(ti, sandbox_private_key_path=sandbox_private_key_path)
+        return CrczpUserSSHConfig(
+            ti,
+            sandbox_private_key_path=sandbox_private_key_path,
+            omitted_node_names=omitted_router_names,
+        )
     # Sandbox jump host name is stack name
     stack_name = sandbox.allocation_unit.get_stack_name()
     proxy_jump = settings.CRCZP_CONFIG.proxy_jump_to_man
-    return CrczpUserSSHConfig(ti, proxy_jump.Host, stack_name, sandbox_private_key_path, proxy_port=proxy_jump.Port)
+    return CrczpUserSSHConfig(
+        ti,
+        proxy_jump.Host,
+        stack_name,
+        sandbox_private_key_path,
+        proxy_port=proxy_jump.Port,
+        omitted_node_names=omitted_router_names,
+    )
 
 
 def get_user_ssh_access(sandbox: Sandbox) -> io.BytesIO:
@@ -150,24 +171,39 @@ def get_management_sshconfig(sandbox: Sandbox,
         -> CrczpMgmtSSHConfig:
     """Get management SSH config."""
     ti = get_topology_instance(sandbox)
+    omitted_router_names = _get_omitted_router_names(ti)
     if _uses_direct_man_access():
-        return CrczpMgmtSSHConfig(ti, pool_private_key_path=pool_private_key_path)
+        return CrczpMgmtSSHConfig(
+            ti,
+            pool_private_key_path=pool_private_key_path,
+            omitted_node_names=omitted_router_names,
+        )
     proxy_jump_host = settings.CRCZP_CONFIG.proxy_jump_to_man.Host
     proxy_jump_user = sandbox.allocation_unit.pool.get_pool_prefix()
     proxy_jump_port = settings.CRCZP_CONFIG.proxy_jump_to_man.Port
     return CrczpMgmtSSHConfig(ti, proxy_jump_host, proxy_jump_user, proxy_port=proxy_jump_port,
                              pool_private_key_path=pool_private_key_path,
-                             proxy_private_key_path=pool_private_key_path)
+                             proxy_private_key_path=pool_private_key_path,
+                             omitted_node_names=omitted_router_names)
 
 
 def get_ansible_sshconfig(sandbox: Sandbox, mng_key: str,
                           proxy_key: Optional[str] = None) -> CrczpAnsibleSSHConfig:
     """Get Ansible SSH config."""
     ti = get_topology_instance(sandbox)
+    omitted_router_names = _get_omitted_router_names(ti)
     if _uses_direct_man_access():
-        return CrczpAnsibleSSHConfig(ti, mng_key)
+        return CrczpAnsibleSSHConfig(ti, mng_key, omitted_node_names=omitted_router_names)
     proxy_jump = settings.CRCZP_CONFIG.proxy_jump_to_man
-    return CrczpAnsibleSSHConfig(ti, mng_key, proxy_jump.Host, proxy_jump.User, proxy_key, proxy_port=int(proxy_jump.Port))
+    return CrczpAnsibleSSHConfig(
+        ti,
+        mng_key,
+        proxy_jump.Host,
+        proxy_jump.User,
+        proxy_key,
+        proxy_port=int(proxy_jump.Port),
+        omitted_node_names=omitted_router_names,
+    )
 
 
 def get_topology_instance(sandbox: Sandbox) -> TopologyInstance:

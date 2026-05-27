@@ -2,6 +2,7 @@ from typing import List
 
 import structlog
 from crczp.cloud_commons import TopologyInstance
+from django.conf import settings
 
 from crczp.sandbox_common_lib.common_cloud import list_images
 from crczp.sandbox_instance_app.lib.nodes import find_image_for_node, get_node_image_has_gui_access
@@ -120,14 +121,15 @@ class Topology(object):
             router_subnets = self._get_subnets_for_router(router_node, top_inst, subnets_dict)
 
             wan_link = top_inst.get_link_between_node_and_network(router_node, top_inst.wan)
-            wan_ip = wan_link.ip if wan_link else None
+            is_logical_only = getattr(settings, 'AZURE_OMIT_ROUTER_VMS', False)
+            wan_ip = '' if is_logical_only else (wan_link.ip if wan_link else '')
 
             router = self.RouterNode(
                 name=router_node.name,
                 os_type=router_image.os_type,
                 gui_access=get_node_image_has_gui_access(router_image),
                 subnets=router_subnets,
-                is_accessible=True,
+                is_accessible=not is_logical_only,
                 ip=wan_ip
             )
             self.routers.append(router)

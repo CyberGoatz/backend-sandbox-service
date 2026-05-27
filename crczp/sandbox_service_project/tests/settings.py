@@ -35,6 +35,16 @@ CRCZP_CONFIG = CRCZP_SERVICE_CONFIG.app_config
 CLOUD_PROVIDER = get_configured_cloud_provider(CRCZP_CONFIG)
 AWS_PROVIDER_CONFIGURED = CLOUD_PROVIDER == CLOUD_PROVIDER_AWS
 AZURE_PROVIDER_CONFIGURED = CLOUD_PROVIDER == CLOUD_PROVIDER_AZURE
+AZURE_NATIVE_ROUTING = (
+    AZURE_PROVIDER_CONFIGURED
+    and CRCZP_CONFIG.azure is not None
+    and CRCZP_CONFIG.azure.native_routing
+)
+AZURE_OMIT_ROUTER_VMS = (
+    AZURE_NATIVE_ROUTING
+    and CRCZP_CONFIG.azure is not None
+    and CRCZP_CONFIG.azure.omit_router_vms
+)
 X509_KEYPAIR_SUPPORTED = provider_supports_x509_keypair(CLOUD_PROVIDER)
 TERRAFORM_CLIENT = get_terraform_client_for_config(CRCZP_CONFIG)
 # ----------------------------------------------------

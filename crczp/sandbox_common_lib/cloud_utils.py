@@ -100,6 +100,8 @@ def get_azure_client(crczp_config: CrczpConfiguration) -> CrczpTerraformClient:
         client_secret=azure_config.client_secret,
         resource_group_name=azure_config.resource_group_name,
         location=azure_config.location,
+        native_routing=getattr(azure_config, 'native_routing', False),
+        omit_router_vms=getattr(azure_config, 'omit_router_vms', False),
         trc=crczp_config.trc,
         cloud_client=AvailableCloudLibraries.AZURE,
         backend_type=CrczpTerraformBackendType(

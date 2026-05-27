@@ -25,19 +25,50 @@ def test_get_configured_cloud_provider_defaults_to_openstack():
 
 
 def test_get_configured_cloud_provider_returns_aws():
-	config = _build_config(aws=SimpleNamespace())
+	config = _build_config(
+		aws=SimpleNamespace(
+			access_key_id='access',
+			secret_access_key='secret',
+			region='region',
+			availability_zone='zone',
+		)
+	)
 
 	assert cloud_utils.get_configured_cloud_provider(config) == cloud_utils.CLOUD_PROVIDER_AWS
 
 
 def test_get_configured_cloud_provider_returns_azure():
-	config = _build_config(azure=SimpleNamespace())
+	config = _build_config(
+		azure=SimpleNamespace(
+			subscription_id='sub',
+			tenant_id='tenant',
+			client_id='client',
+			client_secret='secret',
+			resource_group_name='rg',
+			location='westeurope',
+		)
+	)
 
 	assert cloud_utils.get_configured_cloud_provider(config) == cloud_utils.CLOUD_PROVIDER_AZURE
 
 
 def test_get_configured_cloud_provider_rejects_multiple_explicit_providers():
-	config = _build_config(aws=SimpleNamespace(), azure=SimpleNamespace())
+	config = _build_config(
+		aws=SimpleNamespace(
+			access_key_id='access',
+			secret_access_key='secret',
+			region='region',
+			availability_zone='zone',
+		),
+		azure=SimpleNamespace(
+			subscription_id='sub',
+			tenant_id='tenant',
+			client_id='client',
+			client_secret='secret',
+			resource_group_name='rg',
+			location='westeurope',
+		),
+	)
 
 	with pytest.raises(ValidationError):
 		cloud_utils.get_configured_cloud_provider(config)
@@ -71,6 +102,8 @@ def test_get_azure_client_uses_azure_provider(mocker):
 		client_secret='secret',
 		resource_group_name='rg',
 		location='westeurope',
+		native_routing=False,
+		omit_router_vms=False,
 		trc='trc',
 		cloud_client=AvailableCloudLibraries.AZURE,
 		backend_type=mocker.ANY,

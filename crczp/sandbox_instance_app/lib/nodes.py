@@ -7,6 +7,7 @@ import django_rq
 from crczp.cloud_commons import TopologyInstance, Image
 from crczp.cloud_commons.topology_elements import Node
 from crczp.terraform_driver import TerraformInstance
+from crczp.topology_definition.models import Router
 from django.conf import settings
 from django.core.cache import cache
 
@@ -63,8 +64,23 @@ class NodeAccessData(object):
         self.protocols = protocols
 
 
+def _is_omitted_router(topology_instance: TopologyInstance, node: Node) -> bool:
+    return (
+        getattr(settings, 'AZURE_OMIT_ROUTER_VMS', False)
+        and isinstance(node, Router)
+        and node in topology_instance.get_routers()
+    )
+
+
 def node_action(sandbox: Sandbox, node_name: str, action: str) -> None:
     """Perform action on given node."""
+    from crczp.sandbox_instance_app.lib import sandboxes
+
+    topology_instance = sandboxes.get_topology_instance(sandbox)
+    node = topology_instance.get_node(node_name)
+    if node is not None and _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node_name} is logical-only and has no VM.")
+
     client = utils.get_terraform_client()
     action_dict = {
         'resume': client.resume_node,
@@ -78,6 +94,13 @@ def node_action(sandbox: Sandbox, node_name: str, action: str) -> None:
 
 def get_node(sandbox: Sandbox, node_name: str) -> TerraformInstance:
     """Retrieve Instance from OpenStack."""
+    from crczp.sandbox_instance_app.lib import sandboxes
+
+    topology_instance = sandboxes.get_topology_instance(sandbox)
+    node = topology_instance.get_node(node_name)
+    if node is not None and _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node_name} is logical-only and has no VM.")
+
     client = utils.get_terraform_client()
     return client.get_node(sandbox.allocation_unit.get_stack_name(), node_name)
 
@@ -112,6 +135,8 @@ def get_node_access_data(topology_instance: TopologyInstance, node: Node) -> Nod
         raise exceptions.ValidationError("Topology instance is None")
     if node is None:
         raise exceptions.ValidationError(f"Node is None in topology instance {topology_instance.name}")
+    if _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node.name} is logical-only and has no VM.")
 
     return NodeAccessData(
         man_ip=topology_instance.ip,
