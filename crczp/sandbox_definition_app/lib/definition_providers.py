@@ -1,13 +1,14 @@
+import base64
 from abc import ABC, abstractmethod
+from urllib.parse import urlsplit
 
 import gitlab
+import giturlparse
 import requests
 import structlog
-import giturlparse
-import base64
-
+from github import Auth, Github, GithubException, UnknownObjectException
 from github.ContentFile import ContentFile
-from github import Github, Auth, UnknownObjectException, GithubException
+from giturlparse.result import GitUrlParsed
 
 from crczp.sandbox_common_lib import exceptions, git_config
 from crczp.sandbox_common_lib.crczp_config import CrczpConfiguration
@@ -40,13 +41,10 @@ class DefinitionProvider(ABC):
         pass
 
     @staticmethod
-    def validate_https(url: str) -> giturlparse.parser.Parsed:
-        try:
-            url_parsed = giturlparse.parse(url)
-        except giturlparse.parser.ParserError:
-            raise exceptions.GitError(f"Could not parse GIT URL: url={url}")
+    def validate_https(url: str) -> GitUrlParsed:
+        url_parsed = giturlparse.parse(url)
 
-        if not url.startswith("https://") or not url.endswith(".git"):
+        if not url_parsed.valid or not url.startswith("https://") or not url.endswith(".git"):
             raise exceptions.GitError(
                 f"Invalid URL. Has to be a GIT URL cloned with HTTPS: expected="
                 f"https://example.gitlab.com/[url path].git, actual={url}")
@@ -106,13 +104,9 @@ class GitlabProvider(DefinitionProvider):
             raise exceptions.GitError('Failed to get sha of the GIT rev.', ex)
 
     @staticmethod
-    def get_project_path(url_parsed) -> str:
-        project_path = url_parsed.pathname[:-4] if url_parsed.pathname[-4:] == '.git'\
-            else url_parsed.pathname
-        # https leaves two // at the start
-        path = project_path[2:] if project_path[0:2] == '//' else project_path
-        path_start = path.index('/') + 1
-        return path[path_start:]
+    def get_project_path(url_parsed: GitUrlParsed) -> str:
+        project_path = urlsplit(url_parsed.url).path.strip('/')
+        return project_path[:-4] if project_path.endswith('.git') else project_path
 
 
 class GitHubProvider(DefinitionProvider):
