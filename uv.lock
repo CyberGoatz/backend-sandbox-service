@@ -513,31 +513,6 @@ wheels = [
 ]
 
 [[package]]
-name = "crczp-azure-lib"
-version = "0.1.0"
-source = { directory = "../backend-azure-lib" }
-dependencies = [
-    { name = "azure-identity" },
-    { name = "azure-mgmt-compute" },
-    { name = "azure-mgmt-network" },
-    { name = "azure-mgmt-resource" },
-    { name = "crczp-python-commons" },
-    { name = "jinja2" },
-    { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "azure-identity", specifier = ">=1.23.0" },
-    { name = "azure-mgmt-compute", specifier = ">=34.1.0" },
-    { name = "azure-mgmt-network", specifier = ">=28.1.0" },
-    { name = "azure-mgmt-resource", specifier = ">=23.3.0" },
-    { name = "crczp-python-commons", specifier = "~=1.0.1" },
-    { name = "jinja2", specifier = ">=3.1.3" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
-]
-
-[[package]]
 name = "crczp-openstack-lib"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -582,9 +557,9 @@ dependencies = [
     { name = "crczp-aws-lib" },
     { name = "crczp-openstack-lib" },
     { name = "crczp-python-commons" },
-    { name = "crczp-terraform-client" },
     { name = "crczp-topology-definition" },
     { name = "cryptography" },
+    { name = "cybergoatz-terraform-client" },
     { name = "django" },
     { name = "django-cors-headers" },
     { name = "django-model-utils" },
@@ -633,9 +608,9 @@ requires-dist = [
     { name = "crczp-aws-lib", specifier = "~=1.0.1" },
     { name = "crczp-openstack-lib", specifier = "~=1.0.0" },
     { name = "crczp-python-commons", specifier = "~=1.0.1" },
-    { name = "crczp-terraform-client", directory = "../backend-terraform-client" },
     { name = "crczp-topology-definition", specifier = "~=1.0.0" },
     { name = "cryptography" },
+    { name = "cybergoatz-terraform-client", specifier = ">=1.0.0" },
     { name = "django", specifier = "~=5.0" },
     { name = "django-cors-headers" },
     { name = "django-model-utils" },
@@ -671,27 +646,6 @@ requires-dist = [
     { name = "tox", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]
-
-[[package]]
-name = "crczp-terraform-client"
-version = "1.0.2"
-source = { directory = "../backend-terraform-client" }
-dependencies = [
-    { name = "crczp-aws-lib" },
-    { name = "crczp-azure-lib" },
-    { name = "crczp-openstack-lib" },
-    { name = "crczp-python-commons" },
-    { name = "jinja2" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "crczp-aws-lib", specifier = "~=1.0.1" },
-    { name = "crczp-azure-lib", directory = "../backend-azure-lib" },
-    { name = "crczp-openstack-lib", specifier = "~=1.0.0" },
-    { name = "crczp-python-commons", specifier = "~=1.0.1" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-]
 
 [[package]]
 name = "crczp-topology-definition"
@@ -769,6 +723,40 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/1c/4012edad2a8977ab386c36b6e21f5065974d37afa3eade83a9968cba4855/cryptography-46.0.1-pp311-pypy311_pp73-manylinux_2_34_aarch64.whl", hash = "sha256:15b5fd9358803b0d1cc42505a18d8bca81dabb35b5cfbfea1505092e13a9d96d", size = 4248902, upload-time = "2025-09-17T00:10:26.255Z" },
     { url = "https://files.pythonhosted.org/packages/58/a3/257cd5ae677302de8fa066fca9de37128f6729d1e63c04dd6a15555dd450/cryptography-46.0.1-pp311-pypy311_pp73-manylinux_2_34_x86_64.whl", hash = "sha256:e34da95e29daf8a71cb2841fd55df0511539a6cdf33e6f77c1e95e44006b9b46", size = 4527150, upload-time = "2025-09-17T00:10:28.28Z" },
     { url = "https://files.pythonhosted.org/packages/6a/cd/fe6b65e1117ec7631f6be8951d3db076bac3e1b096e3e12710ed071ffc3c/cryptography-46.0.1-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:34f04b7311174469ab3ac2647469743720f8b6c8b046f238e5cb27905695eb2a", size = 3448210, upload-time = "2025-09-17T00:10:30.145Z" },
+]
+
+[[package]]
+name = "cybergoatz-azure-lib"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-identity" },
+    { name = "azure-mgmt-compute" },
+    { name = "azure-mgmt-network" },
+    { name = "azure-mgmt-resource" },
+    { name = "crczp-python-commons" },
+    { name = "jinja2" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1b/81/6299a2be6cde7f1acfe3ab5181fcadfb64b53f936436dc4e2fe8f5df1c60/cybergoatz_azure_lib-1.0.1.tar.gz", hash = "sha256:f4696817044e2a14c27ff224fa9bcc93377acb246e188b71de6ad0ab118f36d8", size = 70367, upload-time = "2026-05-29T14:46:39.952Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/f4/091f0c11bda92f0d34f00263f7134373dea7acb7f372cebf21148786a967/cybergoatz_azure_lib-1.0.1-py3-none-any.whl", hash = "sha256:09fbcf1c41b0dead2434a3c5e5b2a58d16e77cd5331cc59165bf40fc4c4a2bf5", size = 12399, upload-time = "2026-05-29T14:46:38.972Z" },
+]
+
+[[package]]
+name = "cybergoatz-terraform-client"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "crczp-aws-lib" },
+    { name = "crczp-openstack-lib" },
+    { name = "crczp-python-commons" },
+    { name = "cybergoatz-azure-lib" },
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/fb/26f5d784b61f74681301fbd29336e207284a2a25a27f3d12200d073c935b/cybergoatz_terraform_client-1.0.0.tar.gz", hash = "sha256:624e8a1b368ae15d96b1b89771e4bd690f2ef4a6e6da0c5226e55506db049875", size = 89769, upload-time = "2026-06-01T09:54:03.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/35/7db4efb48bc4220aacf46a873b3d7266aa98316f1a659bacb138cd7a1882/cybergoatz_terraform_client-1.0.0-py3-none-any.whl", hash = "sha256:50d9b1ff9669bbb9f3351abaaca5ede8d9d5b355a17a6cd52cf2d14ca70080a3", size = 13136, upload-time = "2026-06-01T09:54:02.232Z" },
 ]
 
 [[package]]

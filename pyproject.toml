@@ -7,7 +7,6 @@ license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "cybersecurityhub.cz" }]
 dependencies = [
-    "crczp-terraform-client ~=1.0.0",
     "crczp-python-commons ~=1.0.1",
     "crczp-openstack-lib ~=1.0.0",
     "crczp-aws-lib ~=1.0.1",
@@ -47,12 +46,10 @@ dependencies = [
     "kubernetes",
     "paramiko",
     "pygithub",
-    "gunicorn"
+    "gunicorn",
+    "cybergoatz-terraform-client>=1.0.0",
 ]
 
-[tool.uv.sources]
-crczp-terraform-client = { path = "../backend-terraform-client" }
-crczp-azure-lib = { path = "../backend-azure-lib" }
 
 [project.optional-dependencies]
 dev = [
