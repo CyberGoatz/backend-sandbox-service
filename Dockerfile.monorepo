@@ -1,0 +1,51 @@
+FROM python:3.12-slim AS builder
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
+    pip install --no-cache-dir uv && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /var/log/supervisor
+
+RUN uv venv
+COPY backend-sandbox-service/README.md backend-sandbox-service/pyproject.toml backend-sandbox-service/uv.lock ./
+COPY backend-terraform-client /backend-terraform-client
+COPY backend-azure-lib /backend-azure-lib
+RUN uv sync --locked --no-dev --no-editable
+
+FROM python:3.12-slim AS app
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH"
+
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg curl unzip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -fsSL https://get.opentofu.org/install-opentofu.sh -o install-opentofu.sh && \
+    chmod +x install-opentofu.sh && \
+    ./install-opentofu.sh --install-method standalone && \
+    rm -rf install-opentofu.sh /tmp/*
+
+WORKDIR /opt/tofu
+COPY backend-sandbox-service/tofu/openstack.tf .
+COPY backend-sandbox-service/tofu/tofu.rc /opt/tofu/config/tofu.rc
+RUN tofu init && tofu providers mirror /opt/tofu/provider_mirror
+ENV TF_CLI_CONFIG_FILE=/opt/tofu/config/tofu.rc
+
+WORKDIR /app
+
+COPY backend-sandbox-service/bin bin
+COPY backend-sandbox-service/crczp crczp
+COPY backend-sandbox-service/config.yml-template ./config.yml
+COPY backend-sandbox-service/manage.py ./
+COPY --from=builder /app/.venv ./.venv
+
+RUN python manage.py collectstatic --no-input -v 2
+
+EXPOSE 8000
+ENTRYPOINT ["/app/bin/run-sandbox-service.sh"]

@@ -137,3 +137,6 @@ crczp/topology_definition
 
 create-db.sh
 
+.codex
+static/
+config.yml

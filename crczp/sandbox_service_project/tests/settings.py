@@ -12,7 +12,13 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 
 import os
 from crczp.sandbox_common_lib.crczp_service_config import CrczpServiceConfig
-from crczp.sandbox_common_lib.cloud_utils import get_aws_client, get_ostack_client
+from crczp.sandbox_common_lib.cloud_utils import (
+    CLOUD_PROVIDER_AWS,
+    CLOUD_PROVIDER_AZURE,
+    get_configured_cloud_provider,
+    get_terraform_client_for_config,
+    provider_supports_x509_keypair,
+)
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,9 +32,21 @@ CRCZP_CONFIG = CRCZP_SERVICE_CONFIG.app_config
 
 # -----------SIMPLIFY CLOUD PROVIDER CHANGE-----------
 # To reduce setup overhead, create Terraform client during startup of application.
-AWS_PROVIDER_CONFIGURED = bool(CRCZP_CONFIG.aws)
-TERRAFORM_CLIENT = get_aws_client(CRCZP_CONFIG) if AWS_PROVIDER_CONFIGURED \
-                   else get_ostack_client(CRCZP_CONFIG)
+CLOUD_PROVIDER = get_configured_cloud_provider(CRCZP_CONFIG)
+AWS_PROVIDER_CONFIGURED = CLOUD_PROVIDER == CLOUD_PROVIDER_AWS
+AZURE_PROVIDER_CONFIGURED = CLOUD_PROVIDER == CLOUD_PROVIDER_AZURE
+AZURE_NATIVE_ROUTING = (
+    AZURE_PROVIDER_CONFIGURED
+    and CRCZP_CONFIG.azure is not None
+    and CRCZP_CONFIG.azure.native_routing
+)
+AZURE_OMIT_ROUTER_VMS = (
+    AZURE_NATIVE_ROUTING
+    and CRCZP_CONFIG.azure is not None
+    and CRCZP_CONFIG.azure.omit_router_vms
+)
+X509_KEYPAIR_SUPPORTED = provider_supports_x509_keypair(CLOUD_PROVIDER)
+TERRAFORM_CLIENT = get_terraform_client_for_config(CRCZP_CONFIG)
 # ----------------------------------------------------
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = CRCZP_SERVICE_CONFIG.django_secret_key

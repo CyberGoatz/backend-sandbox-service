@@ -9,6 +9,7 @@ import yaml
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import caches
+from crczp.cloud_commons import CrczpException
 from crczp.topology_definition.models import TopologyDefinition, DockerContainers
 from crczp.topology_definition.image_naming import image_name_replace
 from yamlize import YamlizingError
@@ -222,7 +223,7 @@ def validate_topology_definition(topology_definition: TopologyDefinition) -> Non
 
     client = utils.get_terraform_client()
     terraform_flavors = client.get_flavors_dict()
-    terraform_images = [image.name for image in list_images()]
+    terraform_images = {image.name for image in list_images()}
 
     used_flavors = [host.flavor for host in topology_definition.hosts] +\
                    [router.flavor for router in topology_definition.routers]
@@ -236,8 +237,14 @@ def validate_topology_definition(topology_definition: TopologyDefinition) -> Non
                                              f"backend.")
 
     for image in used_images:
-        if image not in terraform_images:
-            raise exceptions.ValidationError(f"Image {image} was not found on the terraform backend.")
+        if image in terraform_images:
+            continue
+        try:
+            client.get_image(image)
+        except CrczpException:
+            raise exceptions.ValidationError(
+                f"Image {image} was not found on the terraform backend."
+            )
 
 
 def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration) -> None:

@@ -21,7 +21,7 @@ from crczp.sandbox_instance_app.lib import pools, sandboxes, nodes, \
 from crczp.sandbox_instance_app.lib import stage_handlers
 from crczp.sandbox_instance_app.models import Pool, Sandbox, SandboxAllocationUnit, \
     AllocationRequest, CleanupRequest, SandboxLock, PoolLock
-from crczp.sandbox_uag.permissions import AdminPermission, OrganizerPermission
+from crczp.sandbox_uag.permissions import AdminPermission, OrganizerPermission, TraineePermission
 
 LOG = structlog.get_logger()
 
@@ -131,6 +131,23 @@ class PoolDetailDeleteUpdateView(generics.RetrieveDestroyAPIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    methods=["GET"],
+    responses={
+        200: serializers.PoolAvailabilitySerializer,
+        **SANDBOX_RESPONSES
+    }
+)
+class PoolAvailabilityView(generics.RetrieveAPIView):
+    """
+    get: Retrieve learner-safe pool availability.
+    """
+    queryset = Pool.objects.all()
+    serializer_class = serializers.PoolAvailabilitySerializer
+    lookup_url_kwarg = "pool_id"
+    permission_classes = [TraineePermission | OrganizerPermission | AdminPermission]
 
 
 @extend_schema(
@@ -985,8 +1002,11 @@ class SandboxConsolesView(APIView):
         consoles are not ready yet."""
         sandbox = sandboxes.get_sandbox(kwargs.get('sandbox_uuid'))
         topology_instance = sandboxes.get_topology_instance(sandbox)
+        routers = [] if settings.AZURE_OMIT_ROUTER_VMS else [
+            router.name for router in topology_instance.get_routers()
+        ]
         node_names = [host.name for host in topology_instance.get_hosts() if not host.hidden] + \
-                     [router.name for router in topology_instance.get_routers()]
+                     routers
         consoles = {}
         is_ready = True
         for name in node_names:
@@ -1031,12 +1051,17 @@ class TopologyNodeConnectionData(APIView):
     # noinspection PyMethodMayBeStatic
     def get(self, request, *args, **kwargs):
         """Retrieves data needed to establish connection to a node in the topology."""
-        sandbox = sandboxes.get_sandbox(kwargs.get('sandbox_uuid'))
-        if sandbox is None:
-            raise Http404(f"Sandbox with UUID {kwargs.get('sandbox_uuid')} does not exist.")
+        sandbox_uuid = kwargs.get('sandbox_uuid')
         node_name = kwargs.get('node_name')
+        username = None if isinstance(request.user, AnonymousUser) else request.user.username
+        sandbox = sandboxes.get_sandbox(sandbox_uuid)
+        if sandbox is None:
+            raise Http404(f"Sandbox with UUID {sandbox_uuid} does not exist.")
         topology_instance = sandboxes.get_topology_instance(sandbox)
         node = topology_instance.get_node(node_name)
         if node is None:
             raise Http404(f"Node with name {node_name} does not exist in the topology of sandbox {sandbox.id}.")
-        return Response(serializers.NodeAccessDataSerializer(nodes.get_node_access_data(topology_instance, node)).data)
+        node_access_data = nodes.get_node_access_data(topology_instance, node)
+        serialized_data = serializers.NodeAccessDataSerializer(node_access_data).data
+
+        return Response(serialized_data)

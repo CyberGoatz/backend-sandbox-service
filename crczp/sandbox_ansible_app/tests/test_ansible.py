@@ -1,6 +1,8 @@
 import pytest
+from unittest.mock import MagicMock
 
 from crczp.sandbox_ansible_app.lib.ansible import AllocationAnsibleRunner
+from crczp.sandbox_ansible_app.lib.container import DockerContainer
 from crczp.sandbox_instance_app.models import Sandbox
 from crczp.sandbox_instance_app.lib import sandboxes
 
@@ -39,3 +41,30 @@ class TestPrepareInventoryFile:
         result = AllocationAnsibleRunner(dir_path).create_inventory(sandbox)
 
         assert result.to_dict() == inventory
+
+
+class TestDockerContainerCommand:
+    def test_run_container_includes_answers_storage_api(self, settings):
+        settings.CRCZP_CONFIG.answers_storage_api = 'http://answers-storage:8087/answers-storage/api/v1'
+        stage = MagicMock()
+
+        DockerContainer('url', 'rev', stage, 'ssh_dir', 'inventory_path',
+                        'containers_path', 'credentials_path')
+
+        command = DockerContainer.CLIENT().containers.run.call_args.kwargs['command']
+        assert command == [
+            '-u', 'url',
+            '-r', 'rev',
+            '-i', '/app/inventory.yml',
+            '-a', 'http://answers-storage:8087/answers-storage/api/v1',
+        ]
+
+    def test_run_container_skips_answers_storage_api_when_not_configured(self, settings):
+        settings.CRCZP_CONFIG.answers_storage_api = ''
+        stage = MagicMock()
+
+        DockerContainer('url', 'rev', stage, 'ssh_dir', 'inventory_path',
+                        'containers_path', 'credentials_path')
+
+        command = DockerContainer.CLIENT().containers.run.call_args.kwargs['command']
+        assert command == ['-u', 'url', '-r', 'rev', '-i', '/app/inventory.yml']

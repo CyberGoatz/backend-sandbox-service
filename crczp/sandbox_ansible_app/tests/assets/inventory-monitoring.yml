@@ -3,10 +3,22 @@ all:
     home:
       ansible_host: 192.168.128.3
       ansible_user: windows
+      host_management_interface:
+        ip: 192.168.128.3
+        mac: 00:00:00:00:00:04
+        net_prefix: 17
+      host_network_interfaces:
+        - ip: 10.10.30.5
+          mac: 00:00:00:00:00:11
+          net_prefix: 24
       user_network_ip: 10.10.30.5
     home-router:
       ansible_host: 192.168.128.7
       ansible_user: debian
+      host_management_interface:
+        ip: 192.168.128.7
+        mac: 00:00:00:00:00:15
+        net_prefix: 17
       interfaces:
         - def_gw_ip: 100.100.100.1
           mac: 00:00:00:00:00:16
@@ -36,10 +48,22 @@ all:
     server:
       ansible_host: 192.168.128.2
       ansible_user: debian
+      host_management_interface:
+        ip: 192.168.128.2
+        mac: 00:00:00:00:00:03
+        net_prefix: 17
+      host_network_interfaces:
+        - ip: 10.10.20.5
+          mac: 00:00:00:00:00:10
+          net_prefix: 24
       user_network_ip: 10.10.20.5
     server-router:
       ansible_host: 192.168.128.6
       ansible_user: debian
+      host_management_interface:
+        ip: 192.168.128.6
+        mac: 00:00:00:00:00:12
+        net_prefix: 17
       interfaces:
         - def_gw_ip: 100.100.100.1
           mac: 00:00:00:00:00:13
@@ -74,6 +98,9 @@ all:
       hosts:
         home: null
         home-router: null
+    windows_hosts:
+      hosts:
+        home: null
     winrm_nodes:
       hosts:
         home: null

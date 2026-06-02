@@ -7,6 +7,7 @@ import django_rq
 from crczp.cloud_commons import TopologyInstance, Image
 from crczp.cloud_commons.topology_elements import Node
 from crczp.terraform_driver import TerraformInstance
+from crczp.topology_definition.models import Router
 from django.conf import settings
 from django.core.cache import cache
 
@@ -63,8 +64,23 @@ class NodeAccessData(object):
         self.protocols = protocols
 
 
+def _is_omitted_router(topology_instance: TopologyInstance, node: Node) -> bool:
+    return (
+        getattr(settings, 'AZURE_OMIT_ROUTER_VMS', False)
+        and isinstance(node, Router)
+        and node in topology_instance.get_routers()
+    )
+
+
 def node_action(sandbox: Sandbox, node_name: str, action: str) -> None:
     """Perform action on given node."""
+    from crczp.sandbox_instance_app.lib import sandboxes
+
+    topology_instance = sandboxes.get_topology_instance(sandbox)
+    node = topology_instance.get_node(node_name)
+    if node is not None and _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node_name} is logical-only and has no VM.")
+
     client = utils.get_terraform_client()
     action_dict = {
         'resume': client.resume_node,
@@ -78,6 +94,13 @@ def node_action(sandbox: Sandbox, node_name: str, action: str) -> None:
 
 def get_node(sandbox: Sandbox, node_name: str) -> TerraformInstance:
     """Retrieve Instance from OpenStack."""
+    from crczp.sandbox_instance_app.lib import sandboxes
+
+    topology_instance = sandboxes.get_topology_instance(sandbox)
+    node = topology_instance.get_node(node_name)
+    if node is not None and _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node_name} is logical-only and has no VM.")
+
     client = utils.get_terraform_client()
     return client.get_node(sandbox.allocation_unit.get_stack_name(), node_name)
 
@@ -112,6 +135,8 @@ def get_node_access_data(topology_instance: TopologyInstance, node: Node) -> Nod
         raise exceptions.ValidationError("Topology instance is None")
     if node is None:
         raise exceptions.ValidationError(f"Node is None in topology instance {topology_instance.name}")
+    if _is_omitted_router(topology_instance, node):
+        raise exceptions.ValidationError(f"Node {node.name} is logical-only and has no VM.")
 
     return NodeAccessData(
         man_ip=topology_instance.ip,
@@ -135,8 +160,15 @@ def find_image_for_node(node: Node, images=None) -> Image:
     for image in images:
         if image.name == node.base_box.image:
             return image
-
-    raise exceptions.ValidationError(f"No image found for node {node.name}")
+    
+    client = utils.get_terraform_client()
+    try:
+        return client.get_image(node.base_box.image)
+    except Exception:
+        raise exceptions.ValidationError(
+            f"No image found for node {node.name}, box image: {node.base_box.image}, "
+            f"image returned from server: {', '.join([image.name for image in images])}"
+        )
 
 
 def get_node_available_protocols(node: Node) -> list[Protocol]:
@@ -154,8 +186,31 @@ def get_node_image_has_gui_access(image: Image) -> bool:
     return image.owner_specified.get('owner_specified.openstack.gui_access') == 'true'
 
 
+def _get_management_node_ip(topology_instance: TopologyInstance, node: Node) -> str | None:
+    """Get the IP address of a node reachable from MAN over the management network."""
+    try:
+        man_link_pairs = topology_instance.get_link_pairs_man_to_nodes_over_management_network()
+    except AttributeError:
+        return None
+
+    for link_pair in man_link_pairs:
+        node_link = link_pair.second
+        if node_link.node == node and node_link.ip:
+            return node_link.ip
+
+    return None
+
+
 def _get_node_ip(topology_instance: TopologyInstance, node: Node) -> str:
-    """Get the IP address of a node from the topology instance."""
+    """Get the IP address of a node from the topology instance.
+
+    Prefer the management-network address because Guacamole/guacd connects from MAN.
+    Fall back to the existing user-accessible host/WAN lookup when no management path exists.
+    """
+    management_ip = _get_management_node_ip(topology_instance, node)
+    if management_ip:
+        return management_ip
+
     host_links = topology_instance.get_node_links(node, topology_instance.get_hosts_networks())
     router_links = topology_instance.get_node_links(node, [topology_instance.wan])
 

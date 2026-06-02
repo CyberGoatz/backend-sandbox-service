@@ -80,10 +80,10 @@ def create_pool(data: Dict, created_by: Optional[User]) -> Pool:
         raise
 
     private_key, public_key = utils.generate_ssh_keypair()
-    if settings.AWS_PROVIDER_CONFIGURED:
-        certificate = ''
-    else:
+    if settings.X509_KEYPAIR_SUPPORTED:
         certificate = utils.create_self_signed_certificate(private_key)
+    else:
+        certificate = ''
 
     pool.private_management_key = private_key
     pool.public_management_key = public_key
@@ -307,4 +307,3 @@ def get_cache_key(pool: Pool) -> str:
     :return: Cache key as string
     """
     return POOL_CACHE_PREFIX.format(pool.id)
-

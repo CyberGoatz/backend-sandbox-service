@@ -57,9 +57,9 @@ application_configuration:
     # The OpenStack console type. One of: novnc, xvpvnc, spice-html5, rdp-html5, serial, webmks.
     #os_console_type: spice-html5
 
-    # AWS specific configuration.
-    # Keeps configuration file backwards compatible.
-    # If AWS configuration is present, it will be used instead of OpenStack configuration.
+    # Cloud provider specific configuration.
+    # Configure at most one explicit provider section at a time.
+    # If neither aws nor azure is configured, the service falls back to OpenStack.
     # aws:
     #   # The access key ID for AWS API.
     #   access_key_id: ""
@@ -78,6 +78,25 @@ application_configuration:
 
     #   # The name of base subnet, where MAN instance will be deployed.
     #   base_subnet: "Base Subnet"
+
+    # azure:
+    #   # Azure subscription where sandbox resources will be provisioned.
+    #   subscription_id: ""
+
+    #   # Azure Entra tenant used for service principal authentication.
+    #   tenant_id: ""
+
+    #   # Azure service principal client ID.
+    #   client_id: ""
+
+    #   # Azure service principal client secret.
+    #   client_secret: ""
+
+    #   # Resource group where sandbox resources will be created.
+    #   resource_group_name: ""
+
+    #   # Azure region, for example westeurope or swedencentral.
+    #   location: ""
 
     # The path to project log file.
     #log_file: sandbox-service.log
@@ -149,7 +168,10 @@ application_configuration:
         # Name of persistent volume claim, only used when backend is kubernetes.
         #persistent_volume_claim_name: sandbox-service
 
-    # The address of answers-storage REST API
+    # The address of answers-storage REST API.
+    # Leave empty to disable answers posting in local/dev runs.
+    # Example for local devops-helm over Vagrant ingress:
+    #answers_storage_api: http://172.19.0.22/answers-storage/api/v1/
     #answers_storage_api: http://answers-storage:8087/answers-storage/api/v1
 
     # A path to directory of CA certificates or file of CA certificates, i.e. CA bundle.

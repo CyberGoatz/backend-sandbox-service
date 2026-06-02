@@ -5,3 +5,8 @@
 .pytest_cache
 
 __pycache__/
+
+.codex
+static/
+dist
+config.yml

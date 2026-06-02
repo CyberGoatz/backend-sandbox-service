@@ -10,14 +10,22 @@ LOG = structlog.get_logger()
 
 def delete_jump_ssh_key(allocation_unit: SandboxAllocationUnit):
     name = allocation_unit.get_stack_name()
-    ssh = connect_to_jump()
-    stdin, stdout, stderr = ssh.exec_command(f"sudo rm -rf /home/{name}")
+    try:
+        ssh = connect_to_jump()
+        stdin, stdout, stderr = ssh.exec_command(f"sudo rm -rf /home/{name}")
 
-    # Wait for the command to finish
-    stdout.channel.recv_exit_status()
-    error = stderr.read().decode()
-    if error:
-        LOG.warning(f"Failed to delete key for {name} from proxy jump: {error}")
+        # Wait for the command to finish
+        stdout.channel.recv_exit_status()
+        error = stderr.read().decode()
+        if error:
+            LOG.warning(f"Failed to delete key for {name} from proxy jump: {error}")
+    except Exception as exc:
+        LOG.warning(
+            "Skipping jump proxy cleanup",
+            allocation_unit_id=allocation_unit.id,
+            stack_name=name,
+            exception=str(exc),
+        )
 
 
 def connect_to_jump():
