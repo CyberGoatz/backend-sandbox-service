@@ -133,6 +133,7 @@ class SandboxLock(models.Model):
         on_delete=models.PROTECT,
         related_name='lock',
     )
+    created = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True,
                                    help_text='The user that created this lock.')
 

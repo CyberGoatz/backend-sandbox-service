@@ -549,6 +549,24 @@ class SandboxCleanupRequestView(generics.RetrieveDestroyAPIView,
         return Response(serializer.data)
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Force the deletion of the sandbox",
+                required=False,
+                default=False
+            ),
+            OpenApiParameter(
+                name="replace",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Provision a replacement sandbox in the same pool after cleanup finishes",
+                required=False,
+                default=False
+            ),
+        ],
         responses={
             201: serializers.CleanupRequestSerializer,
         }
@@ -557,7 +575,8 @@ class SandboxCleanupRequestView(generics.RetrieveDestroyAPIView,
         """ Create cleanup request."""
         unit = self.get_object()
         force = request.GET.get('force', 'false') == 'true'
-        sandbox_requests.create_cleanup_requests([unit], force)
+        replace = request.GET.get('replace', 'false') == 'true'
+        sandbox_requests.create_cleanup_requests([unit], force, replace=replace)
         return Response(status=status.HTTP_201_CREATED)
 
     def delete(self, request, *args, **kwargs):

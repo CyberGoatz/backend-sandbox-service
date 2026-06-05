@@ -332,6 +332,25 @@ class TestCleanupRequestHandlerUnit:
             cleanup_request_finished.useransiblecleanupstage
         ])
 
+    def test_delete_allocation_unit_requests_replacement(self, cleanup_request_finished, mocker):
+        allocation_unit = cleanup_request_finished.allocation_unit
+        pool = allocation_unit.pool
+        pool.size = 1
+        pool.save()
+        fake_create_sandboxes = mocker.patch(
+            'crczp.sandbox_instance_app.lib.request_handlers.pools.create_sandboxes_in_pool'
+        )
+        self.handler.replace = True
+
+        self.handler._delete_allocation_unit(allocation_unit, cleanup_request_finished)
+
+        assert not SandboxAllocationUnit.objects.filter(id=allocation_unit.id).exists()
+        fake_create_sandboxes.assert_called_once()
+        created_pool, created_by, count = fake_create_sandboxes.call_args.args
+        assert created_pool.id == pool.id
+        assert created_by == allocation_unit.created_by
+        assert count == 1
+
 
 @pytest.mark.integration
 class TestAllocationRequestHandler:
