@@ -261,9 +261,11 @@ class CleanupRequestHandler(RequestHandler):
     """
     request: CleanupRequest
     delete_pool: bool
+    replace: bool
 
-    def __init__(self, delete_pool=False):
+    def __init__(self, delete_pool=False, replace=False):
         self.delete_pool = delete_pool
+        self.replace = replace
 
     @transaction.atomic
     def _enqueue_stages(self) -> None:
@@ -335,6 +337,7 @@ class CleanupRequestHandler(RequestHandler):
         """
         Named method used as finalizing stage function.
         """
+        created_by = allocation_unit.created_by
         with transaction.atomic():  # avoid race condition with decrementing pool size in DB
             pool = Pool.objects.select_for_update().get(id=allocation_unit.pool.id)
             pool.size -= 1
@@ -347,6 +350,9 @@ class CleanupRequestHandler(RequestHandler):
         if pool.size == 0 and self.delete_pool:
             pools.delete_pool(pool)
             LOG.info('Pool deleted from DB by final cleanup finishing', cleanup_request=request, pool=pool)
+        elif self.replace and not self.delete_pool:
+            pools.create_sandboxes_in_pool(pool, created_by, 1)
+            LOG.info('Replacement sandbox allocation requested', cleanup_request=request, pool=pool)
 
 
 def request_exception_handler(job: Job, exc_type, exc_value, traceback) -> None:

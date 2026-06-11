@@ -51,7 +51,8 @@ def cancel_allocation_request(alloc_req: AllocationRequest):
     request_handlers.AllocationRequestHandler().cancel_request(alloc_req)
 
 
-def create_cleanup_request_force(allocation_unit: SandboxAllocationUnit, delete_pool):
+def create_cleanup_request_force(allocation_unit: SandboxAllocationUnit, delete_pool=False,
+                                 replace=False):
     """Create cleanup request and enqueue it. Immediately delete sandbox from database.
     The force parameter forces the deletion."""
     if hasattr(allocation_unit, 'cleanup_request') and not allocation_unit.cleanup_request.is_finished:
@@ -78,10 +79,11 @@ def create_cleanup_request_force(allocation_unit: SandboxAllocationUnit, delete_
         sandboxes.clear_cache(sandbox)
         sandbox.delete()
 
-    request_handlers.CleanupRequestHandler(delete_pool=delete_pool).enqueue_request(allocation_unit)
+    request_handlers.CleanupRequestHandler(delete_pool=delete_pool, replace=replace)\
+        .enqueue_request(allocation_unit)
 
 
-def create_cleanup_request(allocation_unit: SandboxAllocationUnit):
+def create_cleanup_request(allocation_unit: SandboxAllocationUnit, replace=False):
     """Create cleanup request and enqueue it. Immediately delete sandbox from database."""
     try:
         sandbox = allocation_unit.sandbox
@@ -113,17 +115,17 @@ def create_cleanup_request(allocation_unit: SandboxAllocationUnit):
         sandboxes.clear_cache(sandbox)
         sandbox.delete()
 
-    request_handlers.CleanupRequestHandler().enqueue_request(allocation_unit)
+    request_handlers.CleanupRequestHandler(replace=replace).enqueue_request(allocation_unit)
 
 
 def create_cleanup_requests(allocation_units: List[SandboxAllocationUnit], force: bool = False,
-                            delete_pool: bool = False):
+                            delete_pool: bool = False, replace: bool = False):
     """Batch version of create_cleanup_request."""
     for unit in allocation_units:
         if force:
-            create_cleanup_request_force(unit, delete_pool)
+            create_cleanup_request_force(unit, delete_pool=delete_pool, replace=replace)
         else:
-            create_cleanup_request(unit)
+            create_cleanup_request(unit, replace=replace)
 
 
 def cancel_cleanup_request(cleanup_req: CleanupRequest) -> None:

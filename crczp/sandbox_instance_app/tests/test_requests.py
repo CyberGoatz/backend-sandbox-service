@@ -109,6 +109,14 @@ class TestCleanupRequest:
         allocation_unit = sandbox_lock.sandbox.allocation_unit
         self.assert_cleanup_request_success(allocation_unit, True)
 
+    def test_create_cleanup_request_force_replace(self, sandbox_lock):
+        allocation_unit = sandbox_lock.sandbox.allocation_unit
+
+        requests.create_cleanup_requests([allocation_unit], force=True, replace=True)
+
+        self.handler.assert_called_once_with(delete_pool=False, replace=True)
+        self.handler.return_value.enqueue_request.assert_called_once_with(allocation_unit)
+
     def test_create_cleanup_request_failed_active_allocation_request(self,
                                                                      allocation_stage_user_started):
         allocation_unit = allocation_stage_user_started.allocation_request.allocation_unit
