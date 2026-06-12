@@ -12,14 +12,14 @@ LOG = structlog.get_logger()
 
 
 class Command(BaseCommand):
-    help = 'Cleanup sandbox allocation units locked longer than the configured idle threshold.'
+    help = 'Cleanup legacy sandbox allocation unit locks that do not have explicit expiry.'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--idle-minutes',
             type=int,
             default=60,
-            help='Cleanup sandboxes whose lock was created at least this many minutes ago.',
+            help='Fallback cleanup threshold for locks without expires_at.',
         )
         parser.add_argument(
             '--replace',
@@ -30,12 +30,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         idle_minutes = options['idle_minutes']
         replace = options['replace']
-        cutoff = timezone.now() - timedelta(minutes=idle_minutes)
+        now = timezone.now()
+        cutoff = now - timedelta(minutes=idle_minutes)
         locks = SandboxLock.objects.select_related(
             'sandbox__allocation_unit',
             'sandbox__allocation_unit__pool',
             'created_by',
-        ).filter(created__lte=cutoff)
+        ).filter(expires_at__isnull=True, created__lte=cutoff)
 
         requested = 0
         skipped = 0
@@ -60,6 +61,6 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f'Idle sandbox cleanup requested={requested} skipped={skipped} '
-                f'idle_minutes={idle_minutes} replace={replace}'
+                f'fallback_idle_minutes={idle_minutes} replace={replace}'
             )
         )

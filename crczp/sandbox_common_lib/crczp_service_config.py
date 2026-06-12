@@ -32,13 +32,16 @@ class Authentication(Object):
     authenticated_rest_api = Attribute(type=bool, default=AUTHENTICATED_REST_API)
     allowed_oidc_providers = Attribute(type=AllowedOidcProviders,
                                        default=tuple(ALLOWED_OIDC_PROVIDERS))
+    service_account_clients = Attribute(type=StrList, default=tuple())
     roles_registration_url = Attribute(type=str)
     roles_acquisition_url = Attribute(type=str)
 
     def __init__(self, authenticated_rest_api, allowed_oidc_providers,
-                 roles_registration_url, roles_acquisition_url):
+                 roles_registration_url, roles_acquisition_url,
+                 service_account_clients=tuple()):
         self.authenticated_rest_api = authenticated_rest_api
         self.allowed_oidc_providers = allowed_oidc_providers
+        self.service_account_clients = service_account_clients
         self.roles_registration_url = roles_registration_url
         self.roles_acquisition_url = roles_acquisition_url
 

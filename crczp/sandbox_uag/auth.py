@@ -60,6 +60,25 @@ def get_or_create_user(request, user_info):
             user.groups.set(cached_groups)
             return user
 
+    token_claims = authenticator_class.get_token_claims(bearer_token)
+    client_id = token_claims.get('azp') or token_claims.get('client_id')
+    service_roles = token_claims.get('sandbox_roles', [])
+    if isinstance(service_roles, str):
+        service_roles = [service_roles]
+    if client_id in UAG_SETTINGS.get('SERVICE_ACCOUNT_CLIENTS', ()) and service_roles:
+        groups = []
+        for group_name in service_roles:
+            try:
+                group = Group.objects.get(name=group_name)
+            except Group.DoesNotExist as ex:
+                raise AuthenticationFailed("Service account {} has role {}, that is not in database: {}".format(
+                    client_id, group_name, str(ex)))
+            groups.append(group)
+        user.groups.set(groups)
+        value_to_cache = (groups, bearer_token)
+        CACHE.set(cache_key, value_to_cache, USER_CACHE_TIMEOUT)
+        return user
+
     try:
         user_roles = get_user_roles(UAG_SETTINGS['ROLES_ACQUISITION_URL'], bearer_token)
     except Exception as ex:

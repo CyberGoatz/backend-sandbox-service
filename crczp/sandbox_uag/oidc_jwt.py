@@ -1,6 +1,7 @@
 import requests
 import structlog
 import base64
+import json
 
 from urllib.parse import urlparse
 from django.conf import settings
@@ -51,6 +52,20 @@ class JWTAccessTokenAuthentication(BearerTokenAuthentication):
             LOG.warn('DANGER! OIDC issuer is not using https protocol.', issuer=issuer)
 
         provider = allowed_issuers[issuer]
+        token_claims = self.get_token_claims(token)
+        client_id = token_claims.get('azp') or token_claims.get('client_id')
+        if client_id in settings.SANDBOX_UAG.get('SERVICE_ACCOUNT_CLIENTS', ()) \
+                and token_claims.get('sandbox_roles'):
+            preferred_username = token_claims.get('preferred_username') or f'service-account-{client_id}'
+            return {
+                'sub': token_claims.get('sub'),
+                'preferred_username': preferred_username,
+                'name': preferred_username,
+                'given_name': preferred_username,
+                'family_name': 'service-account',
+                'email': token_claims.get('email') or f'{preferred_username}@service.local',
+            }
+
         well_known_config = self.get_well_known_config(provider)
         userinfo_endpoint = provider.get('userinfo_endpoint')
         if not userinfo_endpoint:
@@ -62,20 +77,25 @@ class JWTAccessTokenAuthentication(BearerTokenAuthentication):
 
         return response.json()
 
+    @staticmethod
+    def get_token_claims(token):
+        try:
+            token_decoded = token.decode('ascii')
+            payload = token_decoded.split(".")[1]
+            payload += '=' * (-len(payload) % 4)
+            payload_bytes = payload.encode("ascii")
+            payload_string = base64.urlsafe_b64decode(payload_bytes).decode("utf-8")
+            return json.loads(payload_string)
+        except Exception as e:
+            LOG.warn(f'An exception occurred during parsing of the token claims: {e}')
+            return {}
+
     def get_userinfo(self, token):
         sub = ""
         userinfo = None
         try:
-            token_decoded = token.decode('ascii')
-            payload = token_decoded.split(".")[1]
-            payload_bytes = payload.encode("ascii")
-            payload_bytes_decoded = base64.b64decode(payload_bytes + b'==')
-            payload_string = payload_bytes_decoded.decode("ascii")
-
-            sub_pos = payload_string.find('"sub":"')
-            if sub_pos != -1:
-                payload_decoded_trim = payload_string[sub_pos + len('"sub":"'):]
-                sub = payload_decoded_trim[:payload_decoded_trim.find('"')]
+            sub = self.get_token_claims(token).get('sub', '')
+            if sub:
                 userinfo = CACHE.get(OIDC_SUB_PREFIX + sub)
         except Exception as e:
             LOG.warn(f'An exception occurred during parsing of the token: {e}')

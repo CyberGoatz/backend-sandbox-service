@@ -221,17 +221,22 @@ class AllocationTerraformOutputSerializer(serializers.ModelSerializer):
 
 class SandboxSerializer(serializers.ModelSerializer):
     lock_id = serializers.SerializerMethodField()
+    expires_at = serializers.SerializerMethodField()
     allocation_unit_id = serializers.PrimaryKeyRelatedField(source='allocation_unit',
                                                             read_only=True)
 
     class Meta:
         model = models.Sandbox
-        fields = ('id', 'lock_id', 'allocation_unit_id', 'ready')
+        fields = ('id', 'lock_id', 'allocation_unit_id', 'ready', 'expires_at')
         read_only_fields = ('id', 'lock', 'allocation_unit_id', 'ready')
 
     @staticmethod
     def get_lock_id(obj: models.Sandbox) -> Optional[int]:
         return obj.lock.id if hasattr(obj, 'lock') else None
+
+    @staticmethod
+    def get_expires_at(obj: models.Sandbox):
+        return obj.lock.expires_at if hasattr(obj, 'lock') else None
 
 
 class SandboxLockSerializer(serializers.ModelSerializer):
@@ -239,7 +244,7 @@ class SandboxLockSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.SandboxLock
-        fields = ('id', 'sandbox_id', 'created_by')
+        fields = ('id', 'sandbox_id', 'created', 'expires_at', 'created_by')
         read_only_fields = fields
 
 

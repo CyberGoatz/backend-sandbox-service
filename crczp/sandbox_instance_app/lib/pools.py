@@ -189,7 +189,11 @@ def create_sandboxes_in_pool(pool: Pool, created_by: Optional[User], count: int 
         return units
 
 
-def get_unlocked_sandbox(pool: Pool, created_by: Optional[User]) -> Optional[Sandbox]:
+def get_unlocked_sandbox(
+        pool: Pool,
+        created_by: Optional[User],
+        lock_duration_minutes: Optional[int] = None,
+) -> Optional[Sandbox]:
     """Return unlocked sandbox."""
     # TODO: Create Locks immediately on Sandbox creation
     with transaction.atomic():
@@ -205,7 +209,11 @@ def get_unlocked_sandbox(pool: Pool, created_by: Optional[User]) -> Optional[San
 
         if not sandbox:
             return None
-        SandboxLock.objects.create(sandbox=sandbox, created_by=created_by)
+        sandboxes.lock_sandbox(
+            sandbox=sandbox,
+            created_by=created_by,
+            duration_minutes=lock_duration_minutes,
+        )
         return sandbox
 
 
