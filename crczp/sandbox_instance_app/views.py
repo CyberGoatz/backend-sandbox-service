@@ -774,11 +774,29 @@ class SandboxGetAndLockView(generics.RetrieveAPIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         created_by = None if isinstance(request.user, AnonymousUser) else request.user
-        sandbox = pools.get_unlocked_sandbox(pool, created_by)
+        lock_duration_minutes = self._get_lock_duration_minutes(request)
+        sandbox = pools.get_unlocked_sandbox(pool, created_by, lock_duration_minutes)
         if not sandbox:
             return Response({'detail': 'All sandboxes are already locked.'},
                             status=status.HTTP_409_CONFLICT)
         return Response(self.serializer_class(sandbox).data)
+
+    @staticmethod
+    def _get_lock_duration_minutes(request):
+        raw_duration = request.GET.get('lock_duration_minutes')
+        if raw_duration is None:
+            return None
+        try:
+            lock_duration_minutes = int(raw_duration)
+        except ValueError:
+            raise exceptions.ValidationError(
+                f'Invalid lock_duration_minutes parameter: {raw_duration}'
+            )
+        if lock_duration_minutes <= 0:
+            raise exceptions.ValidationError(
+                'lock_duration_minutes must be greater than 0.'
+            )
+        return lock_duration_minutes
 
 
 #######################################
@@ -826,13 +844,23 @@ class SandboxAllocationUnitLockRetrieveCreateDestroyView(generics.RetrieveDestro
     lookup_url_kwarg = "unit_id"
     serializer_class = serializers.SandboxLockSerializer
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            permission_classes = [TraineePermission | OrganizerPermission | AdminPermission]
+        else:
+            permission_classes = [OrganizerPermission | AdminPermission]
+        return [permission() for permission in permission_classes]
+
     def get(self, request, *args, **kwargs):
         """get: Retrieve lock for given sandbox allocation unit if its sandbox exists."""
         allocation_unit = self.get_object()
         if not hasattr(allocation_unit, "sandbox"):
             raise Http404(f'Sandbox allocation unit {allocation_unit.id} has no sandbox.')
         sandbox_id = allocation_unit.sandbox.id
-        lock = SandboxLock.objects.get(sandbox=sandbox_id)
+        try:
+            lock = SandboxLock.objects.get(sandbox=sandbox_id)
+        except SandboxLock.DoesNotExist:
+            raise Http404(f'No SandboxLock matches the given query')
         return Response(self.get_serializer(lock).data)
 
     def post(self, request, *args, **kwargs):
@@ -842,7 +870,12 @@ class SandboxAllocationUnitLockRetrieveCreateDestroyView(generics.RetrieveDestro
             raise Http404(f'Sandbox allocation unit {allocation_unit.id} has no sandbox.')
         sandbox = allocation_unit.sandbox
         created_by = None if isinstance(request.user, AnonymousUser) else request.user
-        lock = sandboxes.lock_sandbox(sandbox=sandbox, created_by=created_by)
+        lock_duration_minutes = SandboxGetAndLockView._get_lock_duration_minutes(request)
+        lock = sandboxes.lock_sandbox(
+            sandbox=sandbox,
+            created_by=created_by,
+            duration_minutes=lock_duration_minutes,
+        )
         return Response(self.get_serializer(lock).data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, *args, **kwargs):

@@ -200,6 +200,7 @@ SANDBOX_UAG = {
     # which supports multiple OIDC providers (parsing them from the token).
     # Only those listed here will be allowed.
     'ALLOWED_OIDC_PROVIDERS': tuple(CRCZP_SERVICE_CONFIG.authentication.allowed_oidc_providers),
+    'SERVICE_ACCOUNT_CLIENTS': tuple(CRCZP_SERVICE_CONFIG.authentication.service_account_clients),
 
     # User and Group roles registration endpoint URL
     'ROLES_REGISTRATION_URL': None,
