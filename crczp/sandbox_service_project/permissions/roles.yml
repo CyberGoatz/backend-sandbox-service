@@ -214,7 +214,7 @@
     - delete_cleanupterraformoutput
 
 - name: trainee
-  default: true
+  default: false
   permissions:
     - view_definition
     - view_sandbox
