@@ -23,6 +23,21 @@ CACHE = caches['uag_auth_groups_cache']
 UAG_SETTINGS = settings.SANDBOX_UAG
 
 
+def _cache_get(key):
+    try:
+        return CACHE.get(key)
+    except Exception as ex:
+        LOG.warning('UAG auth cache get failed; continuing without cache.', key=key, error=str(ex))
+        return None
+
+
+def _cache_set(key, value, timeout):
+    try:
+        CACHE.set(key, value, timeout)
+    except Exception as ex:
+        LOG.warning('UAG auth cache set failed; continuing without cache.', key=key, error=str(ex))
+
+
 def get_or_create_user(request, user_info):
     """
     Retrieve (or create if non-existent) user from database.
@@ -52,7 +67,7 @@ def get_or_create_user(request, user_info):
 
     cache_key = get_cache_key(username, bearer_token)
 
-    cached_value = CACHE.get(cache_key)
+    cached_value = _cache_get(cache_key)
     if cached_value is not None:
         (cached_groups, cached_bearer_token) = cached_value
         # if there is a key collision due to SHA-1 clash, this will detect it
@@ -76,7 +91,7 @@ def get_or_create_user(request, user_info):
             groups.append(group)
         user.groups.set(groups)
         value_to_cache = (groups, bearer_token)
-        CACHE.set(cache_key, value_to_cache, USER_CACHE_TIMEOUT)
+        _cache_set(cache_key, value_to_cache, USER_CACHE_TIMEOUT)
         return user
 
     try:
@@ -97,7 +112,7 @@ def get_or_create_user(request, user_info):
 
     user.groups.set(groups)
     value_to_cache = (groups, bearer_token)
-    CACHE.set(cache_key, value_to_cache, USER_CACHE_TIMEOUT)
+    _cache_set(cache_key, value_to_cache, USER_CACHE_TIMEOUT)
 
     return user
 

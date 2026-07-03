@@ -12,13 +12,28 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from oidc_auth.authentication import BearerTokenAuthentication
 from oidc_auth.settings import api_settings as oidc_auth_settings
-from oidc_auth.util import cache
 
 
 LOG = structlog.get_logger()
 WELL_KNOWN_CONFIG_CACHE_TTL = oidc_auth_settings.OIDC_BEARER_TOKEN_EXPIRATION_TIME
 CACHE = caches['default']
 OIDC_SUB_PREFIX = 'oidc-sub-'
+WELL_KNOWN_CONFIG_PREFIX = 'oidc-well-known-'
+
+
+def _cache_get(key):
+    try:
+        return CACHE.get(key)
+    except Exception as ex:
+        LOG.warning('OIDC cache get failed; continuing without cache.', key=key, error=str(ex))
+        return None
+
+
+def _cache_set(key, value, timeout):
+    try:
+        CACHE.set(key, value, timeout)
+    except Exception as ex:
+        LOG.warning('OIDC cache set failed; continuing without cache.', key=key, error=str(ex))
 
 
 class JWTAccessTokenAuthentication(BearerTokenAuthentication):
@@ -29,14 +44,21 @@ class JWTAccessTokenAuthentication(BearerTokenAuthentication):
         data = JWT().unpack(token).payload()
         return data.get('iss').rstrip('/')
 
-    @cache(ttl=WELL_KNOWN_CONFIG_CACHE_TTL)
     def get_well_known_config(self, provider):
         well_known_config_url = provider.get('well_known_config')
         if not well_known_config_url:
             well_known_config_url = provider['issuer'] + '/.well-known/openid-configuration'
+
+        cache_key = WELL_KNOWN_CONFIG_PREFIX + well_known_config_url
+        cached_config = _cache_get(cache_key)
+        if cached_config is not None:
+            return cached_config
+
         response = requests.get(well_known_config_url)
         response.raise_for_status()
-        return response.json()
+        well_known_config = response.json()
+        _cache_set(cache_key, well_known_config, WELL_KNOWN_CONFIG_CACHE_TTL)
+        return well_known_config
 
     def _get_userinfo(self, token):
         issuer = self.extract_issuer(token)
@@ -96,15 +118,15 @@ class JWTAccessTokenAuthentication(BearerTokenAuthentication):
         try:
             sub = self.get_token_claims(token).get('sub', '')
             if sub:
-                userinfo = CACHE.get(OIDC_SUB_PREFIX + sub)
+                userinfo = _cache_get(OIDC_SUB_PREFIX + sub)
         except Exception as e:
             LOG.warn(f'An exception occurred during parsing of the token: {e}')
 
         if not userinfo:
             userinfo = self._get_userinfo(token)
             if sub:
-                CACHE.set(OIDC_SUB_PREFIX + sub, userinfo,
-                          oidc_auth_settings.OIDC_BEARER_TOKEN_EXPIRATION_TIME)
+                _cache_set(OIDC_SUB_PREFIX + sub, userinfo,
+                           oidc_auth_settings.OIDC_BEARER_TOKEN_EXPIRATION_TIME)
             else:
                 LOG.warn(
                     'Sub was not found in the token, the result of this authentication will not be cached')

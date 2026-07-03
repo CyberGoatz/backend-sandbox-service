@@ -140,3 +140,4 @@ create-db.sh
 .codex
 static/
 config.yml
+.serena

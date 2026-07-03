@@ -34,6 +34,21 @@ DOCKERFILE_FILENAME = 'Dockerfile'
 VARIABLES_FILENAME = 'variables.yml'
 
 
+def _cache_get(cache_backend, key: str, default=None):
+    try:
+        return cache_backend.get(key, default)
+    except Exception as ex:
+        LOG.warning('Definition cache get failed; continuing without cache.', key=key, error=str(ex))
+        return default
+
+
+def _cache_set(cache_backend, key: str, value) -> None:
+    try:
+        cache_backend.set(key, value)
+    except Exception as ex:
+        LOG.warning('Definition cache set failed; continuing without cache.', key=key, error=str(ex))
+
+
 def create_definition(url: str, created_by: Optional[User], rev: str = None) -> Definition:
     """Validates and creates a new definition in database.
 
@@ -116,7 +131,7 @@ def get_definition(url: str, rev: str, config: CrczpConfiguration) -> TopologyDe
     provider = get_def_provider(url, config)
     rev_sha = provider.get_rev_sha(rev)
     cache_key = f'definition-{url}-rev-sha-{rev_sha}-topology'
-    top_def = cache.get(cache_key, None)
+    top_def = _cache_get(cache, cache_key, None)
     if top_def is not None:
         return top_def
 
@@ -128,7 +143,7 @@ def get_definition(url: str, rev: str, config: CrczpConfiguration) -> TopologyDe
 
     top_def = load_definition(io.StringIO(definition))
     validate_topology_definition(top_def)
-    cache.set(cache_key, top_def)
+    _cache_set(cache, cache_key, top_def)
     return top_def
 
 
@@ -287,4 +302,3 @@ def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration) -
         if container_mapping.host not in topdef_host_names:
             raise exceptions.ValidationError(f"Invalid docker container mappings in containers.yml."
                                              f" Host {container_mapping.host} does not exist.")
-

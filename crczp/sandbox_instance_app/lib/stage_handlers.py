@@ -121,6 +121,9 @@ class StageHandler(abc.ABC):
                     .delete(delete_dependents=True)
             except NoSuchJobError:  # Job already deleted
                 pass
+            except Exception as ex:
+                LOG.warning('RQ job delete failed; continuing cancellation without queue cleanup.',
+                            job_id=self.stage.rq_job.job_id, error=str(ex))
         else:
             LOG.warning(f'Stage {self.name} does not have an RQ job')
 

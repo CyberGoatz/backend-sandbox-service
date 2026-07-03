@@ -30,6 +30,21 @@ PROJECT_LIMITS_CACHE_IDENTIFIER = 'project-limits'
 POOL_CACHE_PREFIX = "hardware-usage-pool-{}"
 
 
+def _cache_get(key: str, default=None):
+    try:
+        return cache.get(key, default)
+    except Exception as ex:
+        LOG.warning('Pool cache get failed; continuing without cache.', key=key, error=str(ex))
+        return default
+
+
+def _cache_set(key: str, value, timeout) -> None:
+    try:
+        cache.set(key, value, timeout)
+    except Exception as ex:
+        LOG.warning('Pool cache set failed; continuing without cache.', key=key, error=str(ex))
+
+
 def get_pool(pool_pk: int) -> Pool:
     """
     Retrieves Pool instance from DB (or raises 404).
@@ -287,11 +302,11 @@ def get_hardware_usage_of_sandbox(pool: Pool) -> Optional[HardwareUsage]:
     sentinel = object()
     definition = pool.definition
 
-    hardware_usage = cache.get(get_cache_key(pool), sentinel)
+    hardware_usage = _cache_get(get_cache_key(pool), sentinel)
     if hardware_usage is sentinel:
         hardware_usage = _get_hardware_usage(definition.url, definition.rev)
 
-    limits = cache.get(PROJECT_LIMITS_CACHE_IDENTIFIER, sentinel)
+    limits = _cache_get(PROJECT_LIMITS_CACHE_IDENTIFIER, sentinel)
     if limits is sentinel:
         client = utils.get_terraform_client()
         limits = client.get_project_limits()
@@ -301,8 +316,8 @@ def get_hardware_usage_of_sandbox(pool: Pool) -> Optional[HardwareUsage]:
         hardware_usage_pool *= pool.size
         hardware_usage_pool /= limits
 
-    cache.set(get_cache_key(pool), hardware_usage, POOL_CACHE_TIMEOUT)
-    cache.set(PROJECT_LIMITS_CACHE_IDENTIFIER, limits, POOL_CACHE_TIMEOUT)
+    _cache_set(get_cache_key(pool), hardware_usage, POOL_CACHE_TIMEOUT)
+    _cache_set(PROJECT_LIMITS_CACHE_IDENTIFIER, limits, POOL_CACHE_TIMEOUT)
 
     return hardware_usage_pool
 

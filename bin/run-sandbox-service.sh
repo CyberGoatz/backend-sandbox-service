@@ -2,6 +2,7 @@
 
 LISTEN_IP=0.0.0.0
 LISTEN_PORT=8000
+GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
 
 CREATE_SUPERUSER="
 from django.contrib.auth.models import User
@@ -23,5 +24,5 @@ ${CREATE_SUPERUSER}
 EOF
 echo "Registering roles in user-and-group"
 python manage.py register_roles
-echo "Starting gunicorn on ${LISTEN_IP}:${LISTEN_PORT}"
-gunicorn --bind ${LISTEN_IP}:${LISTEN_PORT} --timeout 600 --workers 5 crczp.sandbox_service_project.wsgi:application
+echo "Starting gunicorn on ${LISTEN_IP}:${LISTEN_PORT} with ${GUNICORN_WORKERS} workers"
+gunicorn --bind ${LISTEN_IP}:${LISTEN_PORT} --timeout 600 --workers "${GUNICORN_WORKERS}" crczp.sandbox_service_project.wsgi:application

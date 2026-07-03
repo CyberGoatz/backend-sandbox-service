@@ -145,7 +145,10 @@ def clear_cache(cache_key: str) -> None:
 
     :param cache_key: Key of record that will be deleted
     """
-    cache.delete(cache_key)
+    try:
+        cache.delete(cache_key)
+    except Exception as ex:
+        LOG.warning('Cache delete failed; continuing.', key=cache_key, error=str(ex))
 
 
 def get_simple_uuid() -> str:
