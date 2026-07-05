@@ -4,6 +4,7 @@ VM Service module for VM management.
 import itertools
 
 import django_rq
+import structlog
 from crczp.cloud_commons import TopologyInstance, Image
 from crczp.cloud_commons.topology_elements import Node
 from crczp.terraform_driver import TerraformInstance
@@ -18,6 +19,32 @@ from crczp.sandbox_instance_app.models import Sandbox
 CACHE_CONSOLE_PREFIX = "console-"
 CACHE_CONSOLE_TIMEOUT = 7200  # the console URLs can last for about 2-3 hours
 CACHE_JOB_WORKER_TIME = 300
+LOG = structlog.get_logger()
+
+
+def _cache_get(key: str, default=None):
+    try:
+        return cache.get(key, default)
+    except Exception as ex:
+        LOG.warning('Console cache get failed; continuing without cache.', key=key, error=str(ex))
+        return default
+
+
+def _cache_set(key: str, value, timeout) -> bool:
+    try:
+        cache.set(key, value, timeout)
+        return True
+    except Exception as ex:
+        LOG.warning('Console cache set failed; continuing without cache.', key=key, error=str(ex))
+        return False
+
+
+def _cache_delete(key: str) -> None:
+    try:
+        cache.delete(key)
+    except Exception as ex:
+        LOG.warning('Console cache delete failed; continuing.', key=key, error=str(ex))
+
 
 class Protocol(object):
     """Represents a protocol used to access a node.
@@ -109,24 +136,27 @@ def get_console_url_job(stack_name, node_name, console_type, console_cache_name,
                         job_cache_id_running):
     client = utils.get_terraform_client()
     console_url = client.get_console_url(stack_name, node_name, console_type)
-    cache.set(console_cache_name, console_url, CACHE_CONSOLE_TIMEOUT)
-    cache.delete(job_cache_id_running)
+    _cache_set(console_cache_name, console_url, CACHE_CONSOLE_TIMEOUT)
+    _cache_delete(job_cache_id_running)
 
 
 def get_console_url(sandbox: Sandbox, node_name: str) -> str:
     """Get console URL for given VM."""
     console_cache_name = CACHE_CONSOLE_PREFIX + str(sandbox.id) + '-' + node_name
     job_cache_id_running = CACHE_CONSOLE_PREFIX + str(sandbox.id) + '-' + node_name + '-running'
-    console_url = cache.get(console_cache_name, None)
+    console_url = _cache_get(console_cache_name, None)
     if console_url:
         return console_url
 
-    job_running = cache.get(job_cache_id_running, False)
+    job_running = _cache_get(job_cache_id_running, False)
     if not job_running:
-        cache.set(job_cache_id_running, True, CACHE_JOB_WORKER_TIME)
-        django_rq.enqueue(get_console_url_job, sandbox.allocation_unit.get_stack_name(),
-                          node_name, settings.CRCZP_CONFIG.os_console_type.value, console_cache_name,
-                          job_cache_id_running)
+        _cache_set(job_cache_id_running, True, CACHE_JOB_WORKER_TIME)
+        try:
+            django_rq.enqueue(get_console_url_job, sandbox.allocation_unit.get_stack_name(),
+                              node_name, settings.CRCZP_CONFIG.os_console_type.value, console_cache_name,
+                              job_cache_id_running)
+        except Exception as ex:
+            LOG.warning('Console URL job enqueue failed; Redis/RQ unavailable.', error=str(ex))
     return ""
 
 

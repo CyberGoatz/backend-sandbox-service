@@ -221,14 +221,20 @@ def get_topology_instance(sandbox: Sandbox) -> TopologyInstance:
     """Get topology instance object. This function is cached."""
     client = utils.get_terraform_client()
     topology_definition, containers = get_topology_definition_and_containers(sandbox)
-    ti = cache.get_or_set(
-        get_cache_key(sandbox),
-        lambda: client.get_enriched_topology_instance(
+    cache_key = get_cache_key(sandbox)
+    try:
+        return cache.get_or_set(
+            cache_key,
+            lambda: client.get_enriched_topology_instance(
+                sandbox.allocation_unit.get_stack_name(),
+                topology_definition, containers),
+            SANDBOX_CACHE_TIMEOUT
+        )
+    except Exception as ex:
+        LOG.warning('Sandbox topology cache failed; loading topology directly.', key=cache_key, error=str(ex))
+        return client.get_enriched_topology_instance(
             sandbox.allocation_unit.get_stack_name(),
-            topology_definition, containers),
-        SANDBOX_CACHE_TIMEOUT
-    )
-    return ti
+            topology_definition, containers)
 
 def get_topology_host(sandbox: Sandbox, host_name: str) -> Host | Router:
     """Get specific host from topology instance."""
@@ -242,7 +248,10 @@ def get_topology_host(sandbox: Sandbox, host_name: str) -> Host | Router:
 
 def clear_cache(sandbox: Sandbox) -> None:
     """Delete cached entries for this sandbox."""
-    cache.delete(get_cache_key(sandbox))
+    try:
+        cache.delete(get_cache_key(sandbox))
+    except Exception as ex:
+        LOG.warning('Sandbox topology cache delete failed; continuing.', key=get_cache_key(sandbox), error=str(ex))
 
 
 def get_cache_key(sandbox: Sandbox) -> str:
