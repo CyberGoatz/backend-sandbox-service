@@ -547,7 +547,7 @@ wheels = [
 
 [[package]]
 name = "crczp-sandbox-service"
-version = "1.6.1"
+version = "1.6.2"
 source = { editable = "." }
 dependencies = [
     { name = "better-profanity" },
@@ -727,7 +727,7 @@ wheels = [
 
 [[package]]
 name = "cybergoatz-azure-lib"
-version = "1.0.1"
+version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -738,14 +738,14 @@ dependencies = [
     { name = "jinja2" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1b/81/6299a2be6cde7f1acfe3ab5181fcadfb64b53f936436dc4e2fe8f5df1c60/cybergoatz_azure_lib-1.0.1.tar.gz", hash = "sha256:f4696817044e2a14c27ff224fa9bcc93377acb246e188b71de6ad0ab118f36d8", size = 70367, upload-time = "2026-05-29T14:46:39.952Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/ed/7ac33fee45ae9743a7a1b1899941062819ffe03256525290f596b318b529/cybergoatz_azure_lib-1.0.2.tar.gz", hash = "sha256:20d026d4e6d07bfc453307f53a5dfdf3c2c6433670ca34d9982a013711fe589b", size = 70381, upload-time = "2026-07-08T06:34:44.308Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/f4/091f0c11bda92f0d34f00263f7134373dea7acb7f372cebf21148786a967/cybergoatz_azure_lib-1.0.1-py3-none-any.whl", hash = "sha256:09fbcf1c41b0dead2434a3c5e5b2a58d16e77cd5331cc59165bf40fc4c4a2bf5", size = 12399, upload-time = "2026-05-29T14:46:38.972Z" },
+    { url = "https://files.pythonhosted.org/packages/51/19/40561139fb4febecca8ba05fcf924bb09d32b48b1e82857cf78fda0a44de/cybergoatz_azure_lib-1.0.2-py3-none-any.whl", hash = "sha256:c28422645b77054a663ebab81f6c59ae34198d82c0495a917834841dea62a37e", size = 12412, upload-time = "2026-07-08T06:34:43.485Z" },
 ]
 
 [[package]]
 name = "cybergoatz-terraform-client"
-version = "1.0.0"
+version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "crczp-aws-lib" },
@@ -754,9 +754,9 @@ dependencies = [
     { name = "cybergoatz-azure-lib" },
     { name = "jinja2" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/75/fb/26f5d784b61f74681301fbd29336e207284a2a25a27f3d12200d073c935b/cybergoatz_terraform_client-1.0.0.tar.gz", hash = "sha256:624e8a1b368ae15d96b1b89771e4bd690f2ef4a6e6da0c5226e55506db049875", size = 89769, upload-time = "2026-06-01T09:54:03.222Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/06/3cbdc6d418ab6bd257ab1db9c4ab6b674c1a54f9ad636d29be5dc23cd7cc/cybergoatz_terraform_client-1.0.1.tar.gz", hash = "sha256:f73f35bf4573a3c9ea49e6fa9609c8aaee7c76eaf8316045479ed83ec8599a54", size = 89781, upload-time = "2026-07-08T09:20:01.283Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/35/7db4efb48bc4220aacf46a873b3d7266aa98316f1a659bacb138cd7a1882/cybergoatz_terraform_client-1.0.0-py3-none-any.whl", hash = "sha256:50d9b1ff9669bbb9f3351abaaca5ede8d9d5b355a17a6cd52cf2d14ca70080a3", size = 13136, upload-time = "2026-06-01T09:54:02.232Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/44/0f176a358b97efe3c443f537161ef595cf322eec19b1a9b57842437ef7de/cybergoatz_terraform_client-1.0.1-py3-none-any.whl", hash = "sha256:1fbadfeaa56054d6716e4ddddfb3db541e6d74982c9342b8bdfb01a350f211b1", size = 13136, upload-time = "2026-07-08T09:20:00.272Z" },
 ]
 
 [[package]]
