@@ -47,7 +47,7 @@ dependencies = [
     "paramiko",
     "pygithub",
     "gunicorn",
-    "cybergoatz-terraform-client>=1.0.0",
+    "cybergoatz-terraform-client>=1.0.1",
 ]
 
 
