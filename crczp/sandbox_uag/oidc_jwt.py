@@ -2,11 +2,14 @@ import requests
 import structlog
 import base64
 import json
+import time
 
 from urllib.parse import urlparse
 from django.conf import settings
 from django.core.cache import caches
 from django.utils.translation import gettext as _
+from authlib.jose import JsonWebKey, JsonWebToken
+from authlib.jose.errors import JoseError
 from jwkest.jwt import JWT
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -18,6 +21,11 @@ LOG = structlog.get_logger()
 WELL_KNOWN_CONFIG_CACHE_TTL = oidc_auth_settings.OIDC_BEARER_TOKEN_EXPIRATION_TIME
 CACHE = caches['default']
 OIDC_SUB_PREFIX = 'oidc-sub-'
+JWKS_PREFIX = 'oidc-jwks-'
+JWKS_CACHE_TTL = oidc_auth_settings.OIDC_JWKS_EXPIRATION_TIME
+# Asymmetric algorithms only: never 'none' or HMAC with a public key.
+SERVICE_ACCOUNT_JWT = JsonWebToken(['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512'])
+CLOCK_SKEW_SECONDS = 60
 WELL_KNOWN_CONFIG_PREFIX = 'oidc-well-known-'
 
 
@@ -38,6 +46,65 @@ def _cache_set(key, value, timeout):
 
 class JWTAccessTokenAuthentication(BearerTokenAuthentication):
     """Use for Bearer token in JWT format. It allows multiple OIDC providers support."""
+
+    def authenticate(self, request):
+        bearer_token = self.get_bearer_token(request)
+        if bearer_token is not None and self.is_service_account_token(self.get_token_claims(bearer_token)):
+            # Service-account tokens are trusted on their claims (no userinfo or user-and-group call),
+            # so their signature must be checked on every request.
+            self.verify_signature(bearer_token)
+        return super().authenticate(request)
+
+    @staticmethod
+    def is_service_account_token(claims: dict) -> bool:
+        client_id = claims.get('azp') or claims.get('client_id')
+        return client_id in settings.SANDBOX_UAG.get('SERVICE_ACCOUNT_CLIENTS', ()) and bool(claims.get('sandbox_roles'))
+
+    def verify_signature(self, token: bytes) -> dict:
+        """Verify signature, issuer and expiry of a JWT against the issuer's JWKS."""
+        failed = AuthenticationFailed(_('Service-account token could not be verified.'))
+        try:
+            issuer = self.extract_issuer(token)
+        except Exception as ex:
+            raise failed from ex
+        providers = {provider['issuer']: provider for provider in settings.SANDBOX_UAG['ALLOWED_OIDC_PROVIDERS']}
+        if issuer not in providers:
+            raise AuthenticationFailed(_('Issuer of the token is not listed in ALLOWED_OIDC_PROVIDERS.'))
+        provider = providers[issuer]
+        errors = (JoseError, ValueError, KeyError, requests.RequestException)
+        try:
+            claims = self._decode(token, self.get_jwks(provider))
+        except errors:
+            try:
+                # The issuer may have rotated its keys since they were cached.
+                claims = self._decode(token, self.get_jwks(provider, refresh=True))
+            except errors as ex:
+                LOG.warning('Service-account token verification failed.', error=str(ex))
+                raise failed from ex
+        if str(claims.get('iss', '')).rstrip('/') != issuer:
+            raise failed
+        return claims
+
+    @staticmethod
+    def _decode(token: bytes, jwks: dict):
+        claims = SERVICE_ACCOUNT_JWT.decode(token.decode('ascii'), JsonWebKey.import_key_set(jwks))
+        claims.validate(now=int(time.time()), leeway=CLOCK_SKEW_SECONDS)
+        if 'exp' not in claims:
+            raise ValueError('Token has no expiry.')
+        return claims
+
+    def get_jwks(self, provider: dict, refresh: bool = False) -> dict:
+        jwks_uri = provider.get('jwks_uri') or self.get_well_known_config(provider)['jwks_uri']
+        cache_key = JWKS_PREFIX + jwks_uri
+        if not refresh:
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                return cached
+        response = requests.get(jwks_uri)
+        response.raise_for_status()
+        jwks = response.json()
+        _cache_set(cache_key, jwks, JWKS_CACHE_TTL)
+        return jwks
 
     @staticmethod
     def extract_issuer(token):
