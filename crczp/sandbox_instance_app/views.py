@@ -9,7 +9,7 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from crczp.sandbox_common_lib import exceptions, utils, log_output_mixin
+from crczp.sandbox_common_lib import exceptions, utils, log_output_mixin, tenancy
 from crczp.sandbox_common_lib.swagger_typing import SandboxDefinitionSerializer, \
     PoolRequestSerializer, PoolResponseSerializer
 from crczp.sandbox_common_lib.utils import get_object_or_404
@@ -53,6 +53,10 @@ class PoolListCreateView(generics.ListCreateAPIView):
     queryset = Pool.objects.all()
     serializer_class = serializers.PoolSerializer
 
+    def get_queryset(self):
+        queryset = tenancy.filter_visible(super().get_queryset(), self.request)
+        return tenancy.filter_pool_visibility(queryset, self.request)
+
     @extend_schema(
         request=OpenApiRequest(PoolRequestSerializer),
         responses={
@@ -67,7 +71,7 @@ class PoolListCreateView(generics.ListCreateAPIView):
          key-pair is the same for each sandbox in the pool.
         """
         created_by = None if isinstance(request.user, AnonymousUser) else request.user
-        pool = pools.create_pool(request.data, created_by)
+        pool = pools.create_pool(request.data, created_by, tenant_key=tenancy.request_tenant(request))
         serializer = self.serializer_class(pool)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -86,6 +90,10 @@ class PoolDetailDeleteUpdateView(generics.RetrieveDestroyAPIView):
     queryset = Pool.objects.all()
     serializer_class = serializers.PoolSerializer
     lookup_url_kwarg = "pool_id"
+
+    def get_queryset(self):
+        queryset = tenancy.filter_visible(super().get_queryset(), self.request)
+        return tenancy.filter_pool_visibility(queryset, self.request)
 
     @extend_schema(
         parameters=[
@@ -147,7 +155,7 @@ class PoolAvailabilityView(generics.RetrieveAPIView):
     queryset = Pool.objects.all()
     serializer_class = serializers.PoolAvailabilitySerializer
     lookup_url_kwarg = "pool_id"
-    permission_classes = [TraineePermission | OrganizerPermission | AdminPermission]
+    permission_classes = [TraineePermission | OrganizerPermission | AdminPermission, tenancy.TenantAccessPermission]
 
 
 @extend_schema(
@@ -730,7 +738,7 @@ class TerraformAllocationStageOutputListView(log_output_mixin.CompressedOutputMi
 )
 class PoolSandboxListView(generics.ListAPIView):
     serializer_class = serializers.SandboxSerializer
-    permission_classes = [OrganizerPermission | AdminPermission]
+    permission_classes = [OrganizerPermission | AdminPermission, tenancy.TenantAccessPermission]
 
     def get_queryset(self):
         pool_id = self.kwargs.get('pool_id')
@@ -846,9 +854,10 @@ class SandboxAllocationUnitLockRetrieveCreateDestroyView(generics.RetrieveDestro
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            permission_classes = [TraineePermission | OrganizerPermission | AdminPermission]
+            permission_classes = [TraineePermission | OrganizerPermission | AdminPermission,
+                                  tenancy.TenantAccessPermission]
         else:
-            permission_classes = [OrganizerPermission | AdminPermission]
+            permission_classes = [OrganizerPermission | AdminPermission, tenancy.TenantAccessPermission]
         return [permission() for permission in permission_classes]
 
     def get(self, request, *args, **kwargs):

@@ -220,6 +220,7 @@ if CRCZP_SERVICE_CONFIG.authentication.authenticated_rest_api:
         'DEFAULT_PERMISSION_CLASSES': (
             'crczp.sandbox_common_lib.permissions.ModelPermissions',
             'rest_framework.permissions.IsAuthenticated',
+            'crczp.sandbox_common_lib.tenancy.TenantAccessPermission',
         ),
         'DEFAULT_AUTHENTICATION_CLASSES': (
             # For testing purposes, uncomment BasicAuthentication.

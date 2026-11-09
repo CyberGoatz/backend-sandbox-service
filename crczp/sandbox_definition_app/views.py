@@ -9,7 +9,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiRequest
 
 from generator.var_generator import generate
 
-from crczp.sandbox_common_lib import utils, exceptions
+from crczp.sandbox_common_lib import utils, exceptions, tenancy
 from crczp.sandbox_common_lib.swagger_typing import SandboxDefinitionSerializer, DefinitionRequestSerializer
 from crczp.sandbox_definition_app import serializers
 from crczp.sandbox_definition_app.lib import definitions
@@ -44,6 +44,9 @@ class DefinitionListCreateView(generics.ListCreateAPIView):
     queryset = Definition.objects.all()
     serializer_class = serializers.DefinitionSerializer
 
+    def get_queryset(self):
+        return tenancy.filter_visible(super().get_queryset(), self.request)
+
     @extend_schema(
         request=OpenApiRequest(DefinitionRequestSerializer),
         responses={
@@ -59,7 +62,8 @@ class DefinitionListCreateView(generics.ListCreateAPIView):
         url = request.data.get('url')
         rev = request.data.get('rev', "master")
         created_by = None if isinstance(request.user, AnonymousUser) else request.user
-        definition = definitions.create_definition(url, created_by, rev)
+        definition = definitions.create_definition(url, created_by, rev,
+                                                   tenant_key=tenancy.request_tenant(request))
         serializer = self.serializer_class(definition)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

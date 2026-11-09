@@ -8,6 +8,9 @@ class Definition(models.Model):
     rev = models.TextField(default='master', help_text='Default revision.')
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True,
                                    help_text='The user that created this definition.')
+    tenant_key = models.CharField(
+        max_length=40, null=True, blank=True, default=None, db_index=True, editable=False,
+        help_text='Tenant (organization alias) that owns this row; null for the global library.')
 
     class Meta:
         ordering = ['id']

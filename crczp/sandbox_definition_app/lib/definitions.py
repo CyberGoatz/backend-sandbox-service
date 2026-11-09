@@ -49,12 +49,14 @@ def _cache_set(cache_backend, key: str, value) -> None:
         LOG.warning('Definition cache set failed; continuing without cache.', key=key, error=str(ex))
 
 
-def create_definition(url: str, created_by: Optional[User], rev: str = None) -> Definition:
+def create_definition(url: str, created_by: Optional[User], rev: str = None,
+                      tenant_key: str | None = None) -> Definition:
     """Validates and creates a new definition in database.
 
     :param url: URL of sandbox definition Git repository
     :param created_by: User creating sandbox definition
     :param rev: Revision of the repository
+    :param tenant_key: Tenant that owns the definition, None for the global library
     :return: New definition instance
     """
     top_def = get_definition(url, rev, settings.CRCZP_CONFIG)
@@ -73,7 +75,7 @@ def create_definition(url: str, created_by: Optional[User], rev: str = None) -> 
             error_message = f"Unknown error: {serializer.errors}"
 
         raise exceptions.ValidationError(error_message)
-    return serializer.save(created_by=created_by)
+    return serializer.save(created_by=created_by, tenant_key=tenant_key)
 
 
 def load_definition(stream: TextIO) -> TopologyDefinition:

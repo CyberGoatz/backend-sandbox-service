@@ -6,7 +6,7 @@ import zipfile
 from typing import List, Dict, Optional
 import structlog
 from django.db import transaction
-from django.db.models import QuerySet, ProtectedError
+from django.db.models import Q, QuerySet, ProtectedError
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -57,7 +57,7 @@ def get_pool(pool_pk: int) -> Pool:
     return get_object_or_404(Pool, pk=pool_pk)
 
 
-def create_pool(data: Dict, created_by: Optional[User]) -> Pool:
+def create_pool(data: Dict, created_by: Optional[User], tenant_key: str | None = None) -> Pool:
     """
     Creates new Pool instance.
     Also creates management key-pairs in OpenStack
@@ -66,9 +66,14 @@ def create_pool(data: Dict, created_by: Optional[User]) -> Pool:
         - definition: primary key (ID) of the Definition that new Pool instance is related to
         - max_size: max size of new Pool instance
     :param created_by: User creating pool
+    :param tenant_key: Tenant that owns the pool, None outside any tenant. A tenant may use its own
+        definitions and the global library.
     :return: new Pool instance
     """
-    definition = get_object_or_404(Definition, pk=data.get('definition_id'))
+    definitions_in_scope = Definition.objects.all()
+    if tenant_key is not None:
+        definitions_in_scope = definitions_in_scope.filter(Q(tenant_key__isnull=True) | Q(tenant_key=tenant_key))
+    definition = get_object_or_404(definitions_in_scope, pk=data.get('definition_id'))
     provider = definitions.get_def_provider(definition.url, settings.CRCZP_CONFIG)
 
     data['rev'] = definition.rev
@@ -76,7 +81,7 @@ def create_pool(data: Dict, created_by: Optional[User]) -> Pool:
 
     serializer = serializers.PoolSerializerCreate(data=data)
     serializer.is_valid(raise_exception=True)
-    pool = serializer.save(created_by=created_by)
+    pool = serializer.save(created_by=created_by, tenant_key=tenant_key)
     try:
         client = utils.get_terraform_client()
 
