@@ -11,8 +11,10 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from rest_framework.validators import UniqueTogetherValidator
 
+from crczp.sandbox_common_lib import exceptions
 from crczp.sandbox_common_lib.serializers import UserSerializer
 from crczp.sandbox_definition_app import models
+from crczp.sandbox_definition_app.lib.paths import normalize_definition_path
 
 
 class DefinitionSerializer(serializers.ModelSerializer):
@@ -20,14 +22,22 @@ class DefinitionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Definition
-        fields = ('id', 'name', 'url', 'rev', 'created_by')
+        fields = ('id', 'name', 'url', 'rev', 'path', 'created_by')
         read_only_fields = ('id', 'name', 'created_by')
         validators = [
             UniqueTogetherValidator(
                 queryset=models.Definition.objects.all(),
-                fields=['url', 'rev']
+                fields=['url', 'rev', 'path']
             )
         ]
+
+    @staticmethod
+    def validate_path(value: str) -> str:
+        try:
+            return normalize_definition_path(value)
+        except exceptions.ValidationError as ex:
+            raise serializers.ValidationError(str(ex))
+
     @extend_schema_field(field=serializers.BooleanField())
     @staticmethod
     def get_created_by(obj: models.Definition) -> bool:
