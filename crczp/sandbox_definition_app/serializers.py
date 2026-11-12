@@ -19,6 +19,9 @@ from crczp.sandbox_definition_app.lib.paths import normalize_definition_path
 
 class DefinitionSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
+    # Declared explicitly so that the uniqueness validator uses '' (repository root) when path is omitted.
+    path = serializers.CharField(required=False, allow_blank=True, default='',
+                                 help_text='Folder inside the repository, empty for the repository root.')
 
     class Meta:
         model = models.Definition
