@@ -6,6 +6,8 @@ class Definition(models.Model):
     name = models.CharField(max_length=100, help_text='Name of the definition.')
     url = models.TextField(help_text='URL of the definition.')
     rev = models.TextField(default='master', help_text='Default revision.')
+    path = models.TextField(default='', blank=True,
+                            help_text='Folder inside the repository, empty for the repository root.')
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True,
                                    help_text='The user that created this definition.')
 
@@ -13,4 +15,4 @@ class Definition(models.Model):
         ordering = ['id']
 
     def __str__(self):
-        return f'ID: {self.id}, NAME: {self.name}, URL: {self.url}, REV: {self.rev}'
+        return f'ID: {self.id}, NAME: {self.name}, URL: {self.url}, REV: {self.rev}, PATH: {self.path}'
