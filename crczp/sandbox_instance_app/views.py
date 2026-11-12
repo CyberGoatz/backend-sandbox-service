@@ -1084,7 +1084,7 @@ class PoolVariablesView(APIView):
         variable_names = []
         try:
             variables = definitions.get_variables(definition.url, definition.rev,
-                                                  settings.CRCZP_CONFIG)
+                                                  settings.CRCZP_CONFIG, definition.path)
             variable_names = [variable.name for variable in variables]
         except exceptions.GitError:
             pass

@@ -81,14 +81,16 @@ def create_pool(data: Dict, created_by: Optional[User]) -> Pool:
         client = utils.get_terraform_client()
 
         # Validate definition
-        top_def = definitions.get_definition(definition.url, pool.rev_sha, settings.CRCZP_CONFIG)
+        top_def = definitions.get_definition(definition.url, pool.rev_sha, settings.CRCZP_CONFIG,
+                                             definition.path)
         definitions.validate_topology_definition(top_def)
 
         # Validate containers
-        containers = definitions.get_containers(definition.url, pool.rev_sha, settings.CRCZP_CONFIG)
+        containers = definitions.get_containers(definition.url, pool.rev_sha, settings.CRCZP_CONFIG,
+                                                definition.path)
         if containers:
             definitions.validate_docker_containers(definition.url, pool.rev_sha,
-                                                   settings.CRCZP_CONFIG)
+                                                   settings.CRCZP_CONFIG, definition.path)
         client.validate_topology_definition(top_def)
     except (exceptions.GitError, exceptions.ValidationError, InvalidTopologyDefinition):
         pool.delete()
@@ -167,7 +169,7 @@ def validate_hardware_usage_of_sandboxes(pool, count) -> None:
     """
     try:
         top_def = definitions.get_definition(pool.definition.url, pool.rev_sha,
-                                             settings.CRCZP_CONFIG)
+                                             settings.CRCZP_CONFIG, pool.definition.path)
         client = utils.get_terraform_client()
         topology_instance = client.get_topology_instance(top_def)
         client.validate_hardware_usage_of_stacks(topology_instance, count)
@@ -271,16 +273,17 @@ def get_management_ssh_access(pool: Pool) -> io.BytesIO:
     return in_memory_zip_file
 
 
-def _get_hardware_usage(url: str, rev: str) -> Optional[HardwareUsage]:
+def _get_hardware_usage(url: str, rev: str, path: str = '') -> Optional[HardwareUsage]:
     """
     Get Heat Stack hardware usage calculated from topology definition.
 
     :param url: URL of git repository from which topology definition is downloaded
     :param rev: Revision of git repository
+    :param path: Folder of the definition inside the repository
     :return: Hardware usage or None if error occurs.
     """
     try:
-        top_def = definitions.get_definition(url, rev, settings.CRCZP_CONFIG)
+        top_def = definitions.get_definition(url, rev, settings.CRCZP_CONFIG, path)
         client = utils.get_terraform_client()
         client.validate_topology_definition(top_def)
         top_instance = client.get_topology_instance(top_def)
@@ -304,7 +307,7 @@ def get_hardware_usage_of_sandbox(pool: Pool) -> Optional[HardwareUsage]:
 
     hardware_usage = _cache_get(get_cache_key(pool), sentinel)
     if hardware_usage is sentinel:
-        hardware_usage = _get_hardware_usage(definition.url, definition.rev)
+        hardware_usage = _get_hardware_usage(definition.url, definition.rev, definition.path)
 
     limits = _cache_get(PROJECT_LIMITS_CACHE_IDENTIFIER, sentinel)
     if limits is sentinel:

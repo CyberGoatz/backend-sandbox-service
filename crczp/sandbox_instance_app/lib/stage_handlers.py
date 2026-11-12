@@ -226,7 +226,8 @@ class AllocationStackStageHandler(StackStageHandler):
         stack_name = allocation_unit.get_stack_name()
         pool = allocation_unit.pool
         definition = pool.definition
-        top_def = definitions.get_definition(definition.url, pool.rev_sha, settings.CRCZP_CONFIG)
+        top_def = definitions.get_definition(definition.url, pool.rev_sha, settings.CRCZP_CONFIG,
+                                             definition.path)
         try:
             self.process = self._client.create_stack(
                 top_def, stack_name=stack_name,

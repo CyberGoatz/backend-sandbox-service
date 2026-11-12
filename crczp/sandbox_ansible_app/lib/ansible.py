@@ -215,8 +215,9 @@ class AllocationAnsibleRunner(AnsibleRunner):
                 dockerfile_path = container_definition.dockerfile
                 url = sandbox.allocation_unit.pool.definition.url
                 rev = sandbox.allocation_unit.pool.definition.rev
+                definition_path = sandbox.allocation_unit.pool.definition.path
                 dockerfile = definitions.get_dockerfile(url, rev, settings.CRCZP_CONFIG,
-                                                        dockerfile_path)
+                                                        dockerfile_path, definition_path)
             self.save_file(os.path.join(host_container_path, "Dockerfile"), dockerfile)
 
     def prepare_containers_directory(self, sandbox: Sandbox):

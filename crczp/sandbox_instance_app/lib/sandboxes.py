@@ -104,8 +104,9 @@ def get_topology_definition_and_containers(sandbox: Sandbox) -> (TopologyDefinit
     """Create topology definition for given sandbox."""
     pool = sandbox.allocation_unit.pool
     definition = pool.definition
-    return definitions.get_definition(definition.url, pool.rev_sha, settings.CRCZP_CONFIG), definitions.get_containers(
-        definition.url, pool.rev_sha, settings.CRCZP_CONFIG)
+    return definitions.get_definition(
+        definition.url, pool.rev_sha, settings.CRCZP_CONFIG, definition.path), definitions.get_containers(
+        definition.url, pool.rev_sha, settings.CRCZP_CONFIG, definition.path)
 
 
 def lock_sandbox(sandbox: Sandbox, created_by: Optional[User], duration_minutes: Optional[int] = None) -> SandboxLock:
