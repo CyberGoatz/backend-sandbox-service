@@ -176,9 +176,25 @@ class TestAllocationRequestHandlerUnit:
             call(StackAllocationStage),
             call(NetworkingAnsibleAllocationStage, repo_url='fake_repo_url', rev='fake_rev'),
             call(UserAnsibleAllocationStage, repo_url=allocation_request.allocation_unit.pool.definition.url,
-                 rev=allocation_request.allocation_unit.pool.rev_sha)
+                 rev=allocation_request.allocation_unit.pool.rev_sha,
+                 path=allocation_request.allocation_unit.pool.definition.path)
         ])
         self.assert_handlers(handlers, [fake_stack_stage, fake_network_stage, fake_user_stage])
+
+    def test_create_stage_handlers_copy_definition_path(self, sandbox, allocation_request):
+        self.handler.request = allocation_request
+        definition = allocation_request.allocation_unit.pool.definition
+        definition.path = 'labs/course/lab-1'
+        self.handler._create_db_stage = MagicMock()
+
+        self.handler._create_stage_handlers(sandbox, SandboxRequestGroup())
+
+        # networking stage keeps the repository root, the user stage gets the definition folder
+        assert self.handler._create_db_stage.call_args_list[1] == call(
+            NetworkingAnsibleAllocationStage, repo_url='fake_repo_url', rev='fake_rev')
+        assert self.handler._create_db_stage.call_args_list[2] == call(
+            UserAnsibleAllocationStage, repo_url=definition.url, rev=allocation_request.allocation_unit.pool.rev_sha,
+            path='labs/course/lab-1')
 
     def test_restart_stage_handlers_not_finished(self, allocation_request_started, sandbox):
         self.handler.request = allocation_request_started
@@ -209,7 +225,8 @@ class TestAllocationRequestHandlerUnit:
             call(StackAllocationStage),
             call(NetworkingAnsibleAllocationStage, repo_url='fake_repo_url', rev='fake_rev'),
             call(UserAnsibleAllocationStage, repo_url=sandbox_failed_stack_stage.allocation_unit.pool.definition.url,
-                 rev=sandbox_failed_stack_stage.allocation_unit.pool.rev_sha)
+                 rev=sandbox_failed_stack_stage.allocation_unit.pool.rev_sha,
+                 path=sandbox_failed_stack_stage.allocation_unit.pool.definition.path)
         ])
         self.assert_handlers(handlers, [fake_stack_stage, fake_network_stage, fake_user_stage])
 
@@ -223,7 +240,8 @@ class TestAllocationRequestHandlerUnit:
 
         self.handler._create_db_stage.assert_called_once_with(
             UserAnsibleAllocationStage, repo_url=sandbox_failed_user_stage.allocation_unit.pool.definition.url,
-            rev=sandbox_failed_user_stage.allocation_unit.pool.rev_sha
+            rev=sandbox_failed_user_stage.allocation_unit.pool.rev_sha,
+            path=sandbox_failed_user_stage.allocation_unit.pool.definition.path
         )
         user_stage = handlers[0]
         assert user_stage.stage == fake_user_stage

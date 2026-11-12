@@ -191,7 +191,8 @@ class AllocationRequestHandler(RequestHandler):
         user_stage = \
             self._create_db_stage(UserAnsibleAllocationStage,
                                   repo_url=self.request.allocation_unit.pool.definition.url,
-                                  rev=self.request.allocation_unit.pool.rev_sha)
+                                  rev=self.request.allocation_unit.pool.rev_sha,
+                                  path=self.request.allocation_unit.pool.definition.path)
         user_stage_handler = AllocationAnsibleStageHandler(user_stage, sandbox, request_group=group)
 
         return [stack_stage_handler, networking_stage_handler, user_stage_handler]
@@ -226,7 +227,8 @@ class AllocationRequestHandler(RequestHandler):
         user_stage = \
             self._create_db_stage(UserAnsibleAllocationStage,
                                   repo_url=self.request.allocation_unit.pool.definition.url,
-                                  rev=self.request.allocation_unit.pool.rev_sha)
+                                  rev=self.request.allocation_unit.pool.rev_sha,
+                                  path=self.request.allocation_unit.pool.definition.path)
         stage_handlers.append(AllocationAnsibleStageHandler(user_stage, sandbox))
 
         return stage_handlers

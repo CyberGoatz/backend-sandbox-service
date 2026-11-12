@@ -8,13 +8,15 @@ from crczp.sandbox_instance_app.models import ExternalDependency, AllocationStag
 class AnsibleAllocationStage(AllocationStage):
     repo_url = models.TextField(help_text='URL of the Ansible repository.')
     rev = models.TextField(help_text='Revision of the Ansible repository.')
+    path = models.TextField(default='', blank=True,
+                            help_text='Folder inside the Ansible repository, empty for the repository root.')
 
     class Meta:
         abstract = True
 
     def __str__(self):
         return super().__str__() + \
-               f', REPO_URL: {self.repo_url}, REV: {self.rev}'
+               f', REPO_URL: {self.repo_url}, REV: {self.rev}, PATH: {self.path}'
 
 
 class NetworkingAnsibleAllocationStage(AnsibleAllocationStage):

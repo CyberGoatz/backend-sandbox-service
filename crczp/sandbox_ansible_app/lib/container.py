@@ -48,10 +48,11 @@ class BaseContainer(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self, url, rev, stage, ssh_directory, inventory_path,
-                 containers_path, credentials_path, cleanup=False):
+                 containers_path, credentials_path, cleanup=False, path=''):
         """Initialize the container."""
         self.url = url
         self.rev = rev
+        self.path = path or ''
         self.stage = stage
         self.cleanup = cleanup
         self.ssh_directory = ssh_directory
@@ -69,6 +70,8 @@ class BaseContainer(abc.ABC):
         The answers-storage endpoint is optional in local/dev environments.
         """
         command = ['-u', self.url, '-r', self.rev, '-i', self.ANSIBLE_INVENTORY_PATH.bind]
+        if self.path:
+            command += ['-p', self.path]
         answers_storage_api = (settings.CRCZP_CONFIG.answers_storage_api or '').strip()
         if answers_storage_api:
             command += ['-a', answers_storage_api]
@@ -115,10 +118,10 @@ class DockerContainer(BaseContainer):
     CLIENT = docker.from_env
 
     def __init__(self, url, rev, stage, ssh_directory, inventory_path,
-                 containers_path, credentials_path, cleanup=False):
+                 containers_path, credentials_path, cleanup=False, path=''):
         """Initialize the container."""
         super().__init__(url, rev, stage, ssh_directory, inventory_path,
-                         containers_path, credentials_path, cleanup)
+                         containers_path, credentials_path, cleanup, path)
         self.container = self._run_container()
 
     def _run_container(self):
@@ -183,10 +186,10 @@ class KubernetesContainer(BaseContainer):
     BATCH_API = client.BatchV1Api()
 
     def __init__(self, url, rev, stage, ssh_directory, inventory_path,
-                 containers_path, credentials_path, cleanup=False):
+                 containers_path, credentials_path, cleanup=False, path=''):
         """Initialize the container."""
         super().__init__(url, rev, stage, ssh_directory, inventory_path,
-                         containers_path, credentials_path, cleanup)
+                         containers_path, credentials_path, cleanup, path)
         self.job_name = self.ALLOCATION_JOB_NAME.format(self.stage.id) if not self.cleanup\
             else self.CLEANUP_JOB_NAME.format(self.stage.id)
         self._initialize_kube_config()

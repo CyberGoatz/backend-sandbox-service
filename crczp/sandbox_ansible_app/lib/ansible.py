@@ -90,13 +90,13 @@ class AnsibleRunner:
             else DockerContainer
         self.template_environment = Environment(loader=(FileSystemLoader(TEMPLATES_DIR_PATH)))
 
-    def run_ansible_playbook(self, url, rev, stage, cleanup=False) -> BaseContainer:
+    def run_ansible_playbook(self, url, rev, stage, cleanup=False, path='') -> BaseContainer:
         """
         Run Ansible playbook in container.
         """
         return self.container_manager(url, rev, stage, self.ssh_directory,
                                       self.inventory_path, self.containers_path,
-                                      self.git_credentials, cleanup)
+                                      self.git_credentials, cleanup, path)
 
     def delete_container(self, container_name: str) -> None:
         """

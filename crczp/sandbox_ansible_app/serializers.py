@@ -18,7 +18,7 @@ class NetworkingAnsibleAllocationStageSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.NetworkingAnsibleAllocationStage
         fields = ('id', 'request_id', 'start', 'end', 'failed', 'error_message',
-                  'repo_url', 'rev')
+                  'repo_url', 'rev', 'path')
         read_only_fields = fields
 
 
@@ -28,7 +28,7 @@ class UserAnsibleAllocationStageSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.UserAnsibleAllocationStage
         fields = ('id', 'request_id', 'start', 'end', 'failed', 'error_message',
-                  'repo_url', 'rev')
+                  'repo_url', 'rev', 'path')
         read_only_fields = fields
 
 

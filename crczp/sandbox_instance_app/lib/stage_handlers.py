@@ -344,7 +344,8 @@ class AllocationAnsibleStageHandler(AnsibleStageHandler):
         runner.prepare_containers_directory(self.sandbox)
         runner.prepare_git_credentials(settings.CRCZP_CONFIG)
 
-        container = runner.run_ansible_playbook(self.stage.repo_url, self.stage.rev, self.stage)
+        container = runner.run_ansible_playbook(self.stage.repo_url, self.stage.rev, self.stage,
+                                                path=self.stage.path)
         try:
             Container.objects.create(allocation_stage=self.stage,
                                      container_name=container.get_container_name())

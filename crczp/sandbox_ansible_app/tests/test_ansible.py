@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from crczp.sandbox_ansible_app.lib.ansible import AllocationAnsibleRunner
-from crczp.sandbox_ansible_app.lib.container import DockerContainer
+from crczp.sandbox_ansible_app.lib.container import DockerContainer, KubernetesContainer
 from crczp.sandbox_instance_app.models import Sandbox
 from crczp.sandbox_instance_app.lib import sandboxes
 
@@ -68,3 +68,28 @@ class TestDockerContainerCommand:
 
         command = DockerContainer.CLIENT().containers.run.call_args.kwargs['command']
         assert command == ['-u', 'url', '-r', 'rev', '-i', '/app/inventory.yml']
+
+    def test_run_container_includes_path_only_when_set(self, settings):
+        settings.CRCZP_CONFIG.answers_storage_api = ''
+        stage = MagicMock()
+
+        DockerContainer('url', 'rev', stage, 'ssh_dir', 'inventory_path',
+                        'containers_path', 'credentials_path', path='labs/course/lab-1')
+
+        command = DockerContainer.CLIENT().containers.run.call_args.kwargs['command']
+        assert command == ['-u', 'url', '-r', 'rev', '-i', '/app/inventory.yml', '-p', 'labs/course/lab-1']
+
+    def test_kubernetes_runner_command_includes_path_only_when_set(self, settings):
+        settings.CRCZP_CONFIG.answers_storage_api = ''
+        for path, expected in (('', []), ('labs/course/lab-1', ['-p', 'labs/course/lab-1'])):
+            container = KubernetesContainer.__new__(KubernetesContainer)
+            container.url, container.rev, container.cleanup, container.path = 'url', 'rev', False, path
+            assert container._build_runner_command() == ['-u', 'url', '-r', 'rev', '-i', '/app/inventory.yml'] + expected
+
+    def test_run_ansible_playbook_passes_path_to_container(self):
+        runner = AllocationAnsibleRunner('dir_path')
+        runner.container_manager = MagicMock()
+
+        runner.run_ansible_playbook('url', 'rev', MagicMock(), path='labs/course/lab-1')
+
+        assert runner.container_manager.call_args.args[-1] == 'labs/course/lab-1'
