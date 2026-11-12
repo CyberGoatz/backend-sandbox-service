@@ -55,11 +55,13 @@ class DefinitionListCreateView(generics.ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         """
         Create a new sandbox definition. Optional parameter *rev* defaults to master.
+        Optional parameter *path* is the folder of the definition inside the repository (default: repository root).
         """
         url = request.data.get('url')
         rev = request.data.get('rev', "master")
+        path = request.data.get('path') or ''
         created_by = None if isinstance(request.user, AnonymousUser) else request.user
-        definition = definitions.create_definition(url, created_by, rev)
+        definition = definitions.create_definition(url, created_by, rev, path)
         serializer = self.serializer_class(definition)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -123,9 +125,9 @@ class DefinitionTopologyView(generics.RetrieveAPIView):
     def get_object(self):
         definition = super().get_object()
         topology_definition = definitions.get_definition(definition.url, definition.rev,
-                                                         settings.CRCZP_CONFIG)
+                                                         settings.CRCZP_CONFIG, definition.path)
         containers = definitions.get_containers(definition.url, definition.rev,
-                                                settings.CRCZP_CONFIG)
+                                                settings.CRCZP_CONFIG, definition.path)
         client = utils.get_terraform_client()
         return Topology(client.get_topology_instance(topology_definition, containers))
 
@@ -148,7 +150,7 @@ class LocalSandboxVariablesView(generics.CreateAPIView):
         access_token = request.data.get('access_token')
 
         definition = self.get_object()
-        variables = definitions.get_variables(definition.url, definition.rev, settings.CRCZP_CONFIG)
+        variables = definitions.get_variables(definition.url, definition.rev, settings.CRCZP_CONFIG, definition.path)
         generate(variables, user_id)
         sandboxes.post_answers(user_id, access_token, variables)
 
@@ -170,7 +172,7 @@ class DefinitionVariablesView(APIView):
         definition = utils.get_object_or_404(Definition, pk=kwargs.get('definition_id'))
         variable_names = []
         try:
-            variables = definitions.get_variables(definition.url, definition.rev, settings.CRCZP_CONFIG)
+            variables = definitions.get_variables(definition.url, definition.rev, settings.CRCZP_CONFIG, definition.path)
             variable_names = [variable.name for variable in variables]
         except exceptions.GitError:
             pass

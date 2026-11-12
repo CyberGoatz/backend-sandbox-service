@@ -23,12 +23,15 @@ class SandboxDefinitionSerializer(serializers.Serializer):
     name = serializers.CharField()
     url = serializers.CharField(help_text='SSH git URL of the definition')
     rev = serializers.CharField(help_text='Git revision used')
+    path = serializers.CharField(help_text='Folder of the definition inside the repository, empty for the root')
     created_by = UserSerializer()
 
 
 class DefinitionRequestSerializer(serializers.Serializer):
     url = serializers.CharField(help_text='SSH git URL of the definition')
     rev = serializers.CharField(help_text='Git revision used')
+    path = serializers.CharField(required=False, allow_blank=True,
+                                 help_text='Folder of the definition inside the repository (default: repository root)')
 
 
 class PoolResponseSerializer(serializers.Serializer):

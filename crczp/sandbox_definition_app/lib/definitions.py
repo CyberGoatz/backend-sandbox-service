@@ -22,6 +22,7 @@ from crczp.sandbox_common_lib.common_cloud import list_images
 from crczp.sandbox_common_lib.crczp_config import CrczpConfiguration, GitType
 from crczp.sandbox_definition_app import serializers
 from crczp.sandbox_definition_app.lib.definition_providers import GitHubProvider, GitlabProvider, DefinitionProvider
+from crczp.sandbox_definition_app.lib.paths import join_definition_path, normalize_definition_path
 from crczp.sandbox_definition_app.models import Definition
 from crczp.sandbox_ansible_app.lib.inventory import DefaultAnsibleHostsGroups
 from crczp.sandbox_common_lib import git_config
@@ -49,23 +50,25 @@ def _cache_set(cache_backend, key: str, value) -> None:
         LOG.warning('Definition cache set failed; continuing without cache.', key=key, error=str(ex))
 
 
-def create_definition(url: str, created_by: Optional[User], rev: str = None) -> Definition:
+def create_definition(url: str, created_by: Optional[User], rev: str = None, path: str = '') -> Definition:
     """Validates and creates a new definition in database.
 
     :param url: URL of sandbox definition Git repository
     :param created_by: User creating sandbox definition
     :param rev: Revision of the repository
+    :param path: Folder of the definition inside the repository, empty for the repository root
     :return: New definition instance
     """
-    top_def = get_definition(url, rev, settings.CRCZP_CONFIG)
+    path = normalize_definition_path(path)
+    top_def = get_definition(url, rev, settings.CRCZP_CONFIG, path)
     validate_topology_definition(top_def)
-    validate_docker_containers(url, rev, settings.CRCZP_CONFIG)
+    validate_docker_containers(url, rev, settings.CRCZP_CONFIG, path)
 
     client = utils.get_terraform_client()
     client.validate_topology_definition(top_def)
 
     serializer = serializers.DefinitionSerializerCreate(
-        data=dict(name=top_def.name, url=url, rev=rev))
+        data=dict(name=top_def.name, url=url, rev=rev, path=path))
     if not serializer.is_valid():
         if str(serializer.errors).find("code='unique'") != -1:
             error_message = "Error: Definition with these parameters already exists"
@@ -118,25 +121,26 @@ def load_docker_containers(stream: TextIO) -> DockerContainers:
     return containers
 
 
-def get_definition(url: str, rev: str, config: CrczpConfiguration) -> TopologyDefinition:
+def get_definition(url: str, rev: str, config: CrczpConfiguration, path: str = '') -> TopologyDefinition:
     """Get sandbox definition file content as TopologyDefinition.
 
     :param url: URL of sandbox definition Git repository
     :param rev: Revision of the repository
     :param config: CrczpConfiguration
+    :param path: Folder of the definition inside the repository, empty for the repository root
     :return: Topology definition
     :raise: GitError if GIT error occurs, ValidationError if definition is incorrect
     """
     cache = caches['topology_cache']
     provider = get_def_provider(url, config)
     rev_sha = provider.get_rev_sha(rev)
-    cache_key = f'definition-{url}-rev-sha-{rev_sha}-topology'
+    cache_key = f'definition-{url}-rev-sha-{rev_sha}-path-{path}-topology'
     top_def = _cache_get(cache, cache_key, None)
     if top_def is not None:
         return top_def
 
     try:
-        definition = provider.get_file(SANDBOX_DEFINITION_FILENAME, rev_sha)
+        definition = provider.get_file(join_definition_path(path, SANDBOX_DEFINITION_FILENAME), rev_sha)
     except exceptions.GitError as ex:
         raise exceptions.GitError("Failed to get sandbox definition file {}.\n"
                                   .format(SANDBOX_DEFINITION_FILENAME) + str(ex))
@@ -147,49 +151,52 @@ def get_definition(url: str, rev: str, config: CrczpConfiguration) -> TopologyDe
     return top_def
 
 
-def get_containers(url: str, rev: str, config: CrczpConfiguration) -> DockerContainers:
+def get_containers(url: str, rev: str, config: CrczpConfiguration, path: str = '') -> DockerContainers:
     """Get containers.yml file content as DockerContainers if the file exists, None otherwise.
 
     :param url: URL of sandbox definition Git repository
     :param rev: Revision of the repository
     :param config: CrczpConfiguration
+    :param path: Folder of the definition inside the repository, empty for the repository root
     :return: DockerContainers, None if not found
     """
     try:
         provider = get_def_provider(url, config)
-        containers = provider.get_file(DOCKER_CONTAINERS_FILENAME, rev)
+        containers = provider.get_file(join_definition_path(path, DOCKER_CONTAINERS_FILENAME), rev)
     except exceptions.GitError as ex:
         return None
 
     return load_docker_containers(io.StringIO(containers))
 
 
-def get_dockerfile(url: str, rev: str, config: CrczpConfiguration, path: str) -> str:
+def get_dockerfile(url: str, rev: str, config: CrczpConfiguration, path: str, definition_path: str = '') -> str:
     """Det Dockerfile from the gitlab repository as string
 
     :param url: URL of sandbox definition Git repository
     :param rev: Revision of the repository
     :param config: CrczpConfiguration
-    :param path: Path to Dockerfile in the repository
+    :param path: Path to Dockerfile folder, relative to the definition folder
+    :param definition_path: Folder of the definition inside the repository, empty for the repository root
     :return: Dockerfile as str
     :raise: GitError if GIT error occurs
     """
     provider = get_def_provider(url, config)
-    return provider.get_file(os.path.join(path, DOCKERFILE_FILENAME), rev)
+    return provider.get_file(join_definition_path(definition_path, os.path.join(path, DOCKERFILE_FILENAME)), rev)
 
 
-def get_variables(url: str, rev: str, config: CrczpConfiguration) -> list:
+def get_variables(url: str, rev: str, config: CrczpConfiguration, path: str = '') -> list:
     """Get APG variables file contents as an array of Variable object.
 
     :param url: URL of sandbox definition Git repository
     :param rev: Revision of the repository
     :param config: CrczpConfiguration
+    :param path: Folder of the definition inside the repository, empty for the repository root
     :return: array of Variables
     :raise: GitError if GIT error occurs
     """
     try:
         provider = get_def_provider(url, config)
-        variables_file = provider.get_file(VARIABLES_FILENAME, rev)
+        variables_file = provider.get_file(join_definition_path(path, VARIABLES_FILENAME), rev)
     except exceptions.GitError as ex:
         raise exceptions.GitError("Unable to retrieve {} file from repository.\n"
                                   .format(VARIABLES_FILENAME) + str(ex))
@@ -262,7 +269,7 @@ def validate_topology_definition(topology_definition: TopologyDefinition) -> Non
             )
 
 
-def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration) -> None:
+def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration, path: str = '') -> None:
     """
     Validates docker containers in relation to themselves and the topology definition (ensures that
     container_mappings contains existing containers and hosts) and that each container has either an image
@@ -271,10 +278,11 @@ def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration) -
     :param url: URL of sandbox definition Git repository
     :param rev: Revision of the repository
     :param config: CrczpConfiguration
+    :param path: Folder of the definition inside the repository, empty for the repository root
     :raise: GitError if GIT error occurs, Validation error if containers are misconfigured
     """
-    topology_definition = get_definition(url, rev, config)
-    containers = get_containers(url, rev, config)
+    topology_definition = get_definition(url, rev, config, path)
+    containers = get_containers(url, rev, config, path)
     if not containers:
         return
     for container in containers.containers:
@@ -284,7 +292,7 @@ def validate_docker_containers(url: str, rev: str, config: CrczpConfiguration) -
                                              f" or dockerfile specified.")
         if container.dockerfile:
             try:
-                get_dockerfile(url, rev, config, container.dockerfile)
+                get_dockerfile(url, rev, config, container.dockerfile, path)
             except exceptions.GitError as ex:
                 raise exceptions.ValidationError(
                     f"Container {container.name} contains invalid Dockerfile path. Error: {ex}")
