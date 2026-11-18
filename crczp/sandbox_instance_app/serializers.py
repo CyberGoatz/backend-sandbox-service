@@ -33,9 +33,9 @@ class PoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Pool
         fields = ('id', 'definition_id', 'size', 'max_size', 'lock_id', 'rev', 'rev_sha', 'comment', 'visible',
-                  'created_by', 'hardware_usage', 'definition', 'send_emails')
+                  'created_by', 'hardware_usage', 'definition', 'send_emails', 'tenant_key')
         read_only_fields = ('id', 'definition_id', 'size', 'lock', 'rev', 'rev_sha', 'created_by', 'hardware_usage',
-                            'definition')
+                            'definition', 'tenant_key')
 
     def update(self, instance: Meta.model, validated_data):
         instance.max_size = validated_data.get('max_size', instance.max_size)

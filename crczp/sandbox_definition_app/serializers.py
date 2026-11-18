@@ -20,8 +20,8 @@ class DefinitionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Definition
-        fields = ('id', 'name', 'url', 'rev', 'created_by')
-        read_only_fields = ('id', 'name', 'created_by')
+        fields = ('id', 'name', 'url', 'rev', 'created_by', 'tenant_key')
+        read_only_fields = ('id', 'name', 'created_by', 'tenant_key')
         validators = [
             UniqueTogetherValidator(
                 queryset=models.Definition.objects.all(),
@@ -37,7 +37,7 @@ class DefinitionSerializer(serializers.ModelSerializer):
 class DefinitionSerializerCreate(DefinitionSerializer):
     """The name needs to be a readable field, otherwise it is ignored."""
     class Meta(DefinitionSerializer.Meta):
-        read_only_fields = ('id',)
+        read_only_fields = ('id', 'tenant_key')
 
 
 class DefinitionRevSerializer(serializers.Serializer):

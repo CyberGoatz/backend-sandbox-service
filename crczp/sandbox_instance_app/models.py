@@ -54,6 +54,9 @@ class Pool(models.Model):
         default=True,
         help_text='Visibility to other instructors. If False, pool is only visible to owner and admins.'
     )
+    tenant_key = models.CharField(
+        max_length=40, null=True, blank=True, default=None, db_index=True, editable=False,
+        help_text='Tenant (organization alias) that owns this row; null for the global library.')
 
     class Meta:
         ordering = ['id']
